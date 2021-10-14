@@ -235,15 +235,23 @@ properties:
   kibana_dashboard: {type: string}
   use_kibana_dashboard: {type: string}
   use_local_time: {type: boolean}
+  custom_pretty_ts_format: {type: string}
   match_enhancements: {type: array, items: {type: string}}
   query_key: *arrayOfString
   replace_dots_in_field_names: {type: boolean}
   scan_entire_timeframe: {type: boolean}
 
+  ### summary table
+  summary_table_fields: {type: array, items: {type: string}}
+  summary_table_type: {type: string, enum: ['ascii', 'markdown']}
+  summary_table_max_rows: {type: integer, minimum: 0}
+  summary_prefix: {type: string}
+  summary_suffix: {type: string}
+
   ### Kibana Discover App Link
   generate_kibana_discover_url: {type: boolean}
   kibana_discover_app_url: {type: string, format: uri}
-  kibana_discover_version: {type: string, enum: ['7.13', '7.12', '7.11', '7.10', '7.9', '7.8', '7.7', '7.6', '7.5', '7.4', '7.3', '7.2', '7.1', '7.0', '6.8', '6.7', '6.6', '6.5', '6.4', '6.3', '6.2', '6.1', '6.0', '5.6']}
+  kibana_discover_version: {type: string, enum: ['7.15', '7.14', '7.13', '7.12', '7.11', '7.10', '7.9', '7.8', '7.7', '7.6', '7.5', '7.4', '7.3', '7.2', '7.1', '7.0', '6.8', '6.7', '6.6', '6.5', '6.4', '6.3', '6.2', '6.1', '6.0', '5.6']}
   kibana_discover_index_pattern_id: {type: string, minLength: 1}
   kibana_discover_columns: {type: array, items: {type: string, minLength: 1}, minItems: 1}
   kibana_discover_from_timedelta: *timedelta
@@ -284,6 +292,52 @@ properties:
   alerta_attributes_keys: {type: array, items: {type: string}}
   alerta_attributes_values: {type: array, items: {type: string}}  # Python format string
 
+  ### Alertmanager
+  alertmanager_hosts: {type: array, items: {type: string}}
+  alertmanager_api_version: {type: string, enum: ['v1', 'v2']}
+  alertmanager_alert_subject_labelname: {type: string}
+  alertmanager_alert_text_labelname: {type: string}
+  alertmanager_proxy: {type: string}
+  alertmanager_ca_certs: {type: boolean}
+  alertmanager_ignore_ssl_errors: {type: boolean}
+  alertmanager_timeout: {type: integer}
+  alertmanager_labels:
+    type: object
+    minProperties: 1
+    patternProperties:
+      "^.+$":
+        oneOf:
+          - type: string
+          - type: object
+            additionalProperties: false
+            required: [field]
+            properties:
+              field: {type: string, minLength: 1}
+  alertmanager_annotations:
+    type: object
+    minProperties: 1
+    patternProperties:
+      "^.+$":
+        oneOf:
+          - type: string
+          - type: object
+            additionalProperties: false
+            required: [field]
+            properties:
+              field: {type: string, minLength: 1}
+  alertmanager_fields:
+    type: object
+    minProperties: 1
+    patternProperties:
+      "^.+$":
+        oneOf:
+          - type: string
+          - type: object
+            additionalProperties: false
+            required: [field]
+            properties:
+              field: {type: string, minLength: 1}
+
   ### AWS SES
   ses_email: *arrayOfString
   ses_from_addr: {type: string}
@@ -305,6 +359,9 @@ properties:
   ### Chatwork
   chatwork_apikey: {type: string}
   chatwork_room_id: {type: string}
+  chatwork_proxy: {type: string}
+  chatwork_proxy_login: {type: string}
+  chatwork_proxy_pass: {type: string}
 
   ### Command
   command: *arrayOfString
@@ -322,6 +379,9 @@ properties:
   dingtalk_single_title: {type: string}
   dingtalk_single_url: {type: string}
   dingtalk_btn_orientation: {type: string}
+  dingtalk_proxy: {type: string}
+  dingtalk_proxy_login: {type: string}
+  dingtalk_proxy_pass: {type: string}
 
   ## Discord
   discord_webhook_url: {type: string}
@@ -379,7 +439,7 @@ properties:
   http_post_ignore_ssl_errors: {type: boolean}
   http_post_timeout: {type: integer}
 
-  ### JIRA
+  ### Jira
   jira_server: {type: string}
   jira_project: {type: string}
   jira_issuetype: {type: string}
@@ -438,6 +498,7 @@ properties:
   opsgenie_key: {type: string}
   opsgenie_account: {type: string}
   opsgenie_addr: {type: string}
+  opsgenie_description: {type:string}
   opsgenie_message: {type: string}
   opsgenie_alias: {type: string}
   opsgenie_subject: {type: string}
@@ -563,6 +624,16 @@ properties:
   telegram_proxy_login: {type: string}
   telegram_proxy_pass: {type: string}
 
+  ### Tencent SMS
+  tencent_sms_secret_id: {type: string}
+  tencent_sms_secret_key: {type: string}
+  tencent_sms_sdk_appid: {type: string}
+  tencent_sms_to_number: {type: array, items: {type: string}}
+  tencent_sms_region: {type: string}
+  tencent_sms_sign_name: {type: string}
+  tencent_sms_template_id: {type: string}
+  tencent_sms_template_parm: {type: array, items: {type: string}}
+  
   ### Twilio
   twilio_account_sid: {type: string}
   twilio_auth_token: {type: string}

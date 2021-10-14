@@ -9,6 +9,7 @@ from texttable import Texttable
 from elastalert.util import EAException, lookup_es_key
 from elastalert.yaml import read_yaml
 
+from collections import Counter
 
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -182,7 +183,7 @@ class Alerter(object):
         return {'type': 'Unknown'}
 
     def create_title(self, matches):
-        """ Creates custom alert title to be used, e.g. as an e-mail subject or JIRA issue summary.
+        """ Creates custom alert title to be used, e.g. as an e-mail subject or Jira issue summary.
 
         :param matches: A list of dictionaries of relevant information to the alert.
         """
@@ -237,19 +238,26 @@ class Alerter(object):
     def get_aggregation_summary_text(self, matches):
         text = ''
         if 'aggregation' in self.rule and 'summary_table_fields' in self.rule:
+            summary_table_type = self.rule.get('summary_table_type', 'ascii')
+
+            #Type independent prefix
             text = self.rule.get('summary_prefix', '')
+            # If a prefix is set, ensure there is a newline between it and the hardcoded
+            # 'Aggregation resulted in...' header below
+            if text != '':
+                text += "\n"
+
             summary_table_fields = self.rule['summary_table_fields']
             if not isinstance(summary_table_fields, list):
                 summary_table_fields = [summary_table_fields]
+
             # Include a count aggregation so that we can see at a glance how many of each aggregation_key were encountered
             summary_table_fields_with_count = summary_table_fields + ['count']
             text += "Aggregation resulted in the following data for summary_table_fields ==> {0}:\n\n".format(
                 summary_table_fields_with_count
             )
-            text_table = Texttable(max_width=self.get_aggregation_summary_text__maximum_width())
-            text_table.header(summary_table_fields_with_count)
-            # Format all fields as 'text' to avoid long numbers being shown as scientific notation
-            text_table.set_cols_dtype(['t' for i in summary_table_fields_with_count])
+
+            # Prepare match_aggregation used in both table types
             match_aggregation = {}
 
             # Maintain an aggregate count for each unique key encountered in the aggregation period
@@ -259,10 +267,44 @@ class Alerter(object):
                     match_aggregation[key_tuple] = 1
                 else:
                     match_aggregation[key_tuple] = match_aggregation[key_tuple] + 1
-            for keys, count in match_aggregation.items():
-                text_table.add_row([key for key in keys] + [count])
-            text += text_table.draw() + '\n\n'
-            text += self.rule.get('summary_prefix', '')
+
+            # Limit number of rows
+            if 'summary_table_max_rows' in self.rule:
+                max_rows = self.rule['summary_table_max_rows']
+                match_aggregation = {k:v for k, v in Counter(match_aggregation).most_common(max_rows)}
+
+            # Type dependent table style
+            if summary_table_type == 'ascii':
+                text_table = Texttable(max_width=self.get_aggregation_summary_text__maximum_width())
+                text_table.header(summary_table_fields_with_count)
+                # Format all fields as 'text' to avoid long numbers being shown as scientific notation
+                text_table.set_cols_dtype(['t' for i in summary_table_fields_with_count])
+
+                for keys, count in match_aggregation.items():
+                    text_table.add_row([key for key in keys] + [count])
+                text += text_table.draw() + '\n\n'
+
+            elif summary_table_type == 'markdown':
+                # Adapted from https://github.com/codazoda/tomark/blob/master/tomark/tomark.py
+                # Create table header
+                text += '| ' + ' | '.join(map(str, summary_table_fields_with_count)) + ' |\n'
+                # Create header separator
+                text += '|-----' * len(summary_table_fields_with_count) + '|\n'
+                # Create table row
+                for keys, count in match_aggregation.items():
+                    markdown_row = ""
+                    for key in keys:
+                        markdown_row += '| ' + str(key) + ' '
+                    text += markdown_row + '| ' + str(count) + ' |\n'
+                text += '\n'
+
+            # max_rows message
+            if 'summary_table_max_rows' in self.rule:
+                text += f"Showing top {self.rule['summary_table_max_rows']} rows"
+                text += "\n"
+
+            # Type independent suffix
+            text += self.rule.get('summary_suffix', '')
         return str(text)
 
     def create_default_title(self, matches):

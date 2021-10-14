@@ -199,7 +199,7 @@ def inc_ts(timestamp, milliseconds=1):
     return dt_to_ts(dt)
 
 
-def pretty_ts(timestamp, tz=True):
+def pretty_ts(timestamp, tz=True, ts_format=None):
     """Pretty-format the given timestamp (to be printed or logged hereafter).
     If tz, the timestamp will be converted to local time.
     Format: YYYY-MM-DD HH:MM TZ"""
@@ -208,7 +208,10 @@ def pretty_ts(timestamp, tz=True):
         dt = ts_to_dt(timestamp)
     if tz:
         dt = dt.astimezone(dateutil.tz.tzlocal())
-    return dt.strftime('%Y-%m-%d %H:%M %z')
+    if ts_format is None:
+        return dt.strftime('%Y-%m-%d %H:%M %Z')
+    else:
+        return dt.strftime(ts_format)
 
 
 def ts_add(ts, td):
@@ -256,13 +259,10 @@ def seconds(td):
 
 
 def total_seconds(dt):
-    # For python 2.6 compatability
     if dt is None:
         return 0
-    elif hasattr(dt, 'total_seconds'):
-        return dt.total_seconds()
     else:
-        return (dt.microseconds + (dt.seconds + dt.days * 24 * 3600) * 10**6) / 10**6
+        return dt.total_seconds()
 
 
 def dt_to_int(dt):
@@ -484,3 +484,55 @@ def should_scrolling_continue(rule_conf):
     stop_the_scroll = 0 < max_scrolling <= rule_conf.get('scrolling_cycle')
 
     return not stop_the_scroll
+
+
+def _expand_string_into_dict(string, value,  sep='.'):
+    """
+    Converts a encapsulated string-dict to a sequence of dict. Use separator (default '.') to split the string.
+    Example: 
+        string1.string2.stringN : value  -> {string1: {string2: {string3: value}}
+ 
+    :param string: The encapsulated "string-dict"
+    :param value: Value associated to the last field of the "string-dict"
+    :param sep: Separator character. Default: '.'
+    :rtype: dict
+    """
+    if sep not in string:
+        return {string : value}
+    key, val = string.split(sep, 1)
+    return {key: _expand_string_into_dict(val, value)}
+ 
+ 
+def expand_string_into_dict(dictionary, string , value, sep='.'):
+    """
+    Useful function to "compile" a string-dict string used in metric and percentage rules into a dictionary sequence.
+ 
+    :param dictionary: The dictionary dict
+    :param string:  String Key 
+    :param value: String Value
+    :param sep: Separator character. Default: '.'
+    :rtype: dict
+    """
+ 
+    if sep not in string:
+        dictionary[string] = value
+        return dictionary
+    else:
+        field1, new_string = string.split(sep, 1)
+        dictionary[field1] = _expand_string_into_dict(new_string, value)
+    return dictionary
+
+
+def format_string(format_config, target_value):
+    """
+    Formats number, supporting %-format and str.format() syntax.
+ 
+    :param format_config: string format syntax, for example '{:.2%}' or '%.2f'
+    :param target_value: number to format
+    :rtype: string
+    """
+    if (format_config.startswith('{')):
+        return format_config.format(target_value)
+    else:
+        return format_config % (target_value)
+

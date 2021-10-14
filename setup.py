@@ -8,12 +8,20 @@ from setuptools import setup
 base_dir = os.path.dirname(__file__)
 setup(
     name='elastalert2',
-    version='2.1.2',
+    version='2.2.2',
     description='Automated rule-based alerting for Elasticsearch',
+    long_description=open('README.md').read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/jertel/elastalert2",
     setup_requires='setuptools',
     license='Apache 2.0',
+    project_urls={
+        "Documentation": "https://elastalert2.readthedocs.io",
+        "Source Code": "https://github.com/jertel/elastalert2",
+        "Discussion Forum": "https://github.com/jertel/elastalert2/discussions",
+    },
     classifiers=[
-        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'License :: OSI Approved :: Apache Software License',
         'Operating System :: OS Independent',
     ],
@@ -34,7 +42,7 @@ setup(
         'envparse>=0.2.0',
         'exotel>=0.1.3',
         'jira>=2.0.0',
-        'Jinja2==2.11.3',
+        'Jinja2==3.0.1',
         'jsonschema>=3.0.2',
         'prison>=0.1.2',
         'prometheus_client>=0.10.1',
@@ -47,6 +55,7 @@ setup(
         'twilio>=6.0.0,<6.58',
         'cffi>=1.11.5',
         'statsd-tags==3.2.1.post1',
-        'tzlocal<3.0'
+        'tencentcloud-sdk-python>=3.0.484',
+        'jsonpointer>=2.1'
     ]
 )

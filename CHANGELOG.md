@@ -9,6 +9,84 @@
 ## Other changes
 - None
 
+# 2.x.x
+
+## Breaking changes
+- None
+
+## New features
+- [Alertmanager] Added support for Alertmanager - [#503](https://github.com/jertel/elastalert2/pull/503) - @nsano-rururu
+- Add summary_table_max_rows optional configuration to limit rows in summary tables - [#508](https://github.com/jertel/elastalert2/pull/508) - @mdavyt92
+
+## Other changes
+- [Docs] Add exposed metrics documentation - [#498](https://github.com/jertel/elastalert2/pull/498) - @thisisxgp
+- [Tests] Fix rules_test.py - [#499](https://github.com/jertel/elastalert2/pull/499) - @nsano-rururu
+- Upgrade to Python 3.10 and Sphinx 4.2.0 - [#501](https://github.com/jertel/elastalert2/pull/501) - @jertel
+- max_scrolling_count now has a default value of 990 to avoid stack overflow crashes - [#509](https://github.com/jertel/elastalert2/pull/509) - @jertel
+- Update pytest 6.2.5, pytest-cov 3.0.0, pytest-xdist 2.4.0, pylint<2.12, tox 3.24.4 - [#511](https://github.com/jertel/elastalert2/pull/511) - @nsano-rururu
+
+# 2.2.2
+
+## Breaking changes
+- None
+
+## New features
+- Added support for markdown style formatting of aggregation tables - [#415](https://github.com/jertel/elastalert2/pull/415) - @Neuro-HSOC
+- [OpsGenie] Add support for custom description - [#457](https://github.com/jertel/elastalert2/pull/457), [#460](https://github.com/jertel/elastalert2/pull/460) - @nickbabkin
+- [Tencent SMS] Added support for Tencent SMS - [#470](https://github.com/jertel/elastalert2/pull/470) - @liuxingjun
+- Add support for Kibana 7.15 for Kibana Discover - [#481](https://github.com/jertel/elastalert2/pull/481) - @nsano-rururu
+- Begin working toward support of OpenSearch (beta) [#483](https://github.com/jertel/elastalert2/pull/483) @nbrownus
+
+## Other changes
+- [Rule Test] Fix issue related to --start/--end/--days params - [#424](https://github.com/jertel/elastalert2/pull/424), [#433](https://github.com/jertel/elastalert2/pull/433) - @thican
+- Changed the wording of ElastAlert to ElastAlert 2 and Update FAQ -[#446](https://github.com/jertel/elastalert2/pull/446) - @nsano-rururu
+- Add missing show_ssl_warn and silence_qk_value params to docs - [#469](https://github.com/jertel/elastalert2/pull/469) - @jertel
+- [OpsGenie] Clarify documentation for URL endpoint to use in European region - [#475](https://github.com/jertel/elastalert2/pull/475) - @nsano-rururu
+- [Docs] The documentation has been updated as the name of Amazon Elasticsearch Service has changed to Amazon OpenSearch Service. - [#478](https://github.com/jertel/elastalert2/pull/478) - @nsano-rururu
+- [Tests] Improve test coverage of tencentsms.py - [#479](https://github.com/jertel/elastalert2/pull/479) - @liuxingjun
+- [Docs] Tidy Exotel documentation - [#488](https://github.com/jertel/elastalert2/pull/488) - @ferozsalam
+
+# 2.2.1
+
+## Breaking changes
+- None
+
+## New features
+- None
+
+## Other changes
+- Fixed typo in default setting accidentally introduced in [#407](https://github.com/jertel/elastalert2/pull/407) - [#413](https://github.com/jertel/elastalert2/pull/413) - @perceptron01
+
+# 2.2.0
+
+## Breaking changes
+- [VictorOps] Changed `state_message` and `entity_display_name` values to be taken from an alert rule. - [#329](https://github.com/jertel/elastalert2/pull/329) - @ChristophShyper
+  - Potentially a breaking change if the alert subject changes due to the new default behavior.
+- Change metric/percentage rule types to store query_key as dict, instead of string, for consistency with other rule types. [#340](https://github.com/jertel/elastalert2/issues/340) - @AntoineBlaud
+
+## New features
+- [Kubernetes] Adding Image Pull Secret to Helm Chart - [#370](https://github.com/jertel/elastalert2/pull/370) - @robrankin
+- Apply percentage_format_string to match_body percentage value; will appear in new percentage_formatted key - [#387](https://github.com/jertel/elastalert2/pull/387) - @iamxeph
+- Add support for Kibana 7.14 for Kibana Discover - [#392](https://github.com/jertel/elastalert2/pull/392) - @nsano-rururu
+- Add metric_format_string optional configuration for Metric Aggregation to format aggregated value - [#399](https://github.com/jertel/elastalert2/pull/399) - @iamxeph
+- Make percentage_format_string support format() syntax in addition to old %-formatted syntax - [#403](https://github.com/jertel/elastalert2/pull/403) - @iamxeph
+- Add custom_pretty_ts_format option to provides a way to define custom format of timestamps printed by pretty_ts() function - [#407](https://github.com/jertel/elastalert2/pull/407) - @perceptron01
+
+## Other changes
+- [Tests] Improve test code coverage - [#331](https://github.com/jertel/elastalert2/pull/331) - @nsano-rururu
+- [Docs] Upgrade Sphinx from 4.0.2 to 4.1.2- [#332](https://github.com/jertel/elastalert2/pull/332) [#343](https://github.com/jertel/elastalert2/pull/343) [#344](https://github.com/jertel/elastalert2/pull/344) [#369](https://github.com/jertel/elastalert2/pull/369) - @nsano-rururu
+- Ensure hit count returns correct value for newer ES clusters - [#333](https://github.com/jertel/elastalert2/pull/333) - @jeffashton
+- [Tests] Upgrade Tox from 3.23.1 to 3.24.1 - [#345](https://github.com/jertel/elastalert2/pull/345) [#388](https://github.com/jertel/elastalert2/pull/388)  - @nsano-rururu
+- Upgrade Jinja from 2.11.3 to 3.0.1 - [#350](https://github.com/jertel/elastalert2/pull/350) - @mrfroggg
+- [Tests] Add test code. Changed ubuntu version of Dockerfile-test from latest to 21.10. - [#354](https://github.com/jertel/elastalert2/pull/354) - @nsano-rururu
+- Remove Python 2.x compatibility code - [#354](https://github.com/jertel/elastalert2/pull/354) - @nsano-rururu
+- [Docs] Added Chatwork proxy settings to documentation - [#360](https://github.com/jertel/elastalert2/pull/360) - @nsano-rururu
+- Add settings to schema.yaml(Chatwork proxy, Dingtalk proxy) - [#361](https://github.com/jertel/elastalert2/pull/361) - @nsano-rururu
+- [Docs] Tidy Twilio alerter documentation - [#363](https://github.com/jertel/elastalert2/pull/363) - @ferozsalam
+- [Tests] Improved test coverage for opsgenie.py 96% to 100% - [#364](https://github.com/jertel/elastalert2/pull/364) - @nsano-rururu
+- [Docs] Update mentions of JIRA to Jira - [#365](https://github.com/jertel/elastalert2/pull/365) - @ferozsalam
+- [Docs] Tidy Datadog alerter documentation - [#380](https://github.com/jertel/elastalert2/pull/380) - @ferozsalam
+
 # 2.1.2
 ## Breaking changes
 - None

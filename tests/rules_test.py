@@ -10,12 +10,14 @@ from elastalert.ruletypes import BaseAggregationRule
 from elastalert.ruletypes import BlacklistRule
 from elastalert.ruletypes import CardinalityRule
 from elastalert.ruletypes import ChangeRule
+from elastalert.ruletypes import CompareRule
 from elastalert.ruletypes import EventWindow
 from elastalert.ruletypes import FlatlineRule
 from elastalert.ruletypes import FrequencyRule
 from elastalert.ruletypes import MetricAggregationRule
 from elastalert.ruletypes import NewTermsRule
 from elastalert.ruletypes import PercentageMatchRule
+from elastalert.ruletypes import RuleType
 from elastalert.ruletypes import SpikeRule
 from elastalert.ruletypes import WhitelistRule
 from elastalert.util import dt_to_ts
@@ -131,6 +133,13 @@ def test_freq_count():
     assert len(rule.matches) == 0
     rule.add_count_data({ts_to_dt('2014-10-10T01:00:00'): 75})
     assert len(rule.matches) == 1
+
+    # except EAException
+    try:
+        rule = FrequencyRule(rules)
+        rule.add_count_data('aaaa')
+    except EAException as ea:
+        assert 'add_count_data can only accept one count at a time' in str(ea)
 
 
 def test_freq_out_of_order():
@@ -547,7 +556,14 @@ def test_change():
     assert rule.matches == []
 
 
-def test_new_term():
+@pytest.mark.parametrize('version, expected_is_five_or_above', [
+    ({'version': {'number': '2.x.x'}}, False),
+    ({'version': {'number': '5.x.x'}}, True),
+    ({'version': {'number': '6.x.x'}}, True),
+    ({'version': {'number': '7.x.x'}}, True),
+    ({'version': {'number': '7.10.2', 'distribution': 'opensearch'}}, True),
+])
+def test_new_term(version, expected_is_five_or_above):
     rules = {'fields': ['a', 'b'],
              'timestamp_field': '@timestamp',
              'es_host': 'example.com', 'es_port': 10, 'index': 'logstash',
@@ -558,7 +574,7 @@ def test_new_term():
     with mock.patch('elastalert.ruletypes.elasticsearch_client') as mock_es:
         mock_es.return_value = mock.Mock()
         mock_es.return_value.search.return_value = mock_res
-        mock_es.return_value.info.return_value = {'version': {'number': '2.x.x'}}
+        mock_es.return_value.info.return_value = version
         call_args = []
 
         # search is called with a mutable dict containing timestamps, this is required to test
@@ -568,6 +584,8 @@ def test_new_term():
 
         mock_es.return_value.search.side_effect = record_args
         rule = NewTermsRule(rules)
+
+    assert rule.is_five_or_above() == expected_is_five_or_above
 
     # 30 day default range, 1 day default step, times 2 fields
     assert rule.es.search.call_count == 60
@@ -610,11 +628,12 @@ def test_new_term():
     with mock.patch('elastalert.ruletypes.elasticsearch_client') as mock_es:
         mock_es.return_value = mock.Mock()
         mock_es.return_value.search.return_value = mock_res
-        mock_es.return_value.info.return_value = {'version': {'number': '2.x.x'}}
+        mock_es.return_value.info.return_value = version
         rule = NewTermsRule(rules)
     rule.add_data([{'@timestamp': ts_now(), 'a': 'key2'}])
     assert len(rule.matches) == 1
     assert rule.matches[0]['missing_field'] == 'b'
+    assert rule.is_five_or_above() == expected_is_five_or_above
 
 
 def test_new_term_nested_field():
@@ -1154,10 +1173,33 @@ def test_metric_aggregation():
     rule.check_matches(datetime.datetime.now(), None, {'metric_cpu_pct_avg': {'value': 0.95}})
     assert len(rule.matches) == 2
 
-    rules['query_key'] = 'qk'
+    rule = MetricAggregationRule(rules)
+    rule.check_matches(datetime.datetime.now(), None, {'metric_cpu_pct_avg': {'value': 0.966666667}})
+    assert '0.966666667' in rule.get_match_str(rule.matches[0])
+    assert rule.matches[0]['metric_cpu_pct_avg'] == 0.966666667
+    assert 'metric_cpu_pct_avg_formatted' not in rule.matches[0]
+    rules['metric_format_string'] = '{:.2%}'
+    rule = MetricAggregationRule(rules)
+    rule.check_matches(datetime.datetime.now(), None, {'metric_cpu_pct_avg': {'value': 0.966666667}})
+    assert '96.67%' in rule.get_match_str(rule.matches[0])
+    assert rule.matches[0]['metric_cpu_pct_avg'] == 0.966666667
+    assert rule.matches[0]['metric_cpu_pct_avg_formatted'] == '96.67%'
+    rules['metric_format_string'] = '%.2f'
+    rule = MetricAggregationRule(rules)
+    rule.check_matches(datetime.datetime.now(), None, {'metric_cpu_pct_avg': {'value': 0.966666667}})
+    assert '0.97' in rule.get_match_str(rule.matches[0])
+    assert rule.matches[0]['metric_cpu_pct_avg'] == 0.966666667
+    assert rule.matches[0]['metric_cpu_pct_avg_formatted'] == '0.97'
+
+    rules['query_key'] = 'subdict'
     rule = MetricAggregationRule(rules)
     rule.check_matches(datetime.datetime.now(), 'qk_val', {'metric_cpu_pct_avg': {'value': 0.95}})
-    assert rule.matches[0]['qk'] == 'qk_val'
+    assert rule.matches[0]['subdict'] == 'qk_val'
+
+    rules['query_key'] = 'subdict1.subdict2.subdict3'
+    rule = MetricAggregationRule(rules)
+    rule.check_matches(datetime.datetime.now(), 'qk_val', {'metric_cpu_pct_avg': {'value': 0.95}})
+    assert rule.matches[0]['subdict1']['subdict2']['subdict3'] == 'qk_val'
 
 
 def test_metric_aggregation_complex_query_key():
@@ -1266,10 +1308,76 @@ def test_percentage_match():
     rule.check_matches(datetime.datetime.now(), None, create_percentage_match_agg(76, 24))
     assert len(rule.matches) == 2
 
+    rule = PercentageMatchRule(rules)
+    rule.check_matches(datetime.datetime.now(), None, create_percentage_match_agg(76.666666667, 24))
+    assert '76.1589403974' in rule.get_match_str(rule.matches[0])
+    assert rule.matches[0]['percentage'] == 76.15894039742994
+    assert 'percentage_formatted' not in rule.matches[0]
+    rules['percentage_format_string'] = '{:.2f}'
+    rule = PercentageMatchRule(rules)
+    rule.check_matches(datetime.datetime.now(), None, create_percentage_match_agg(76.666666667, 24))
+    assert '76.16' in rule.get_match_str(rule.matches[0])
+    assert rule.matches[0]['percentage'] == 76.15894039742994
+    assert rule.matches[0]['percentage_formatted'] == '76.16'
+    rules['percentage_format_string'] = '%.2f'
+    rule = PercentageMatchRule(rules)
+    rule.check_matches(datetime.datetime.now(), None, create_percentage_match_agg(76.666666667, 24))
+    assert '76.16' in rule.get_match_str(rule.matches[0])
+    assert rule.matches[0]['percentage'] == 76.15894039742994
+    assert rule.matches[0]['percentage_formatted'] == '76.16'
+
     rules['query_key'] = 'qk'
     rule = PercentageMatchRule(rules)
     rule.check_matches(datetime.datetime.now(), 'qk_val', create_percentage_match_agg(76.666666667, 24))
     assert rule.matches[0]['qk'] == 'qk_val'
-    assert '76.1589403974' in rule.get_match_str(rule.matches[0])
-    rules['percentage_format_string'] = '%.2f'
-    assert '76.16' in rule.get_match_str(rule.matches[0])
+
+    rules['query_key'] = 'subdict1.subdict2'
+    rule = PercentageMatchRule(rules)
+    rule.check_matches(datetime.datetime.now(), 'qk_val', create_percentage_match_agg(76.666666667, 24))
+    assert rule.matches[0]['subdict1']['subdict2'] == 'qk_val'
+
+
+def test_ruletype_add_data():
+    try:
+        RuleType.garbage_collect('', '')
+        RuleType.add_data('', '')
+        assert False
+    except NotImplementedError:
+        assert True
+
+
+def test_ruletype_garbage_collect():
+    RuleType.garbage_collect('', '')
+    assert True
+
+
+def test_ruletype_add_count_data():
+    try:
+        RuleType.add_count_data('', '')
+        assert False
+    except NotImplementedError:
+        assert True
+
+
+def test_ruletype_add_terms_data():
+    try:
+        RuleType.add_terms_data('', '')
+        assert False
+    except NotImplementedError:
+        assert True
+
+
+def test_ruletype_add_aggregation_data():
+    try:
+        RuleType.add_aggregation_data('', '')
+        assert False
+    except NotImplementedError:
+        assert True
+
+
+def test_comparerule_compare():
+    try:
+        CompareRule.compare('', '')
+        assert False
+    except NotImplementedError:
+        assert True

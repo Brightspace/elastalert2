@@ -908,3 +908,275 @@ def test_opsgenie_substitution(opsgenie_entity, expected_entity, opsgenie_priori
 
         assert mcal[0][1]['json']['entity'] == expected_entity
         assert mcal[0][1]['json']['priority'] == expected_priority
+
+
+def test_opsgenie_details_with_constant_value_matchs():
+    rule = {
+        'name': 'Opsgenie Details',
+        'type': mock_rule(),
+        'opsgenie_account': 'genies',
+        'opsgenie_key': 'ogkey',
+        'opsgenie_details': {'Foo': 'Bar'}
+    }
+    match = {
+        '@timestamp': '2014-10-31T00:00:00'
+    }
+    alert = OpsGenieAlerter(rule)
+
+    with mock.patch('requests.post') as mock_post_request:
+        alert.alert([match, match])
+
+    mock_post_request.assert_called_once_with(
+        'https://api.opsgenie.com/v2/alerts',
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': 'GenieKey ogkey'
+        },
+        json=mock.ANY,
+        proxies=None
+    )
+
+    expected_json = {
+        'description': 'Opsgenie Details\n'
+                       '\n'
+                       "{'@timestamp': '2014-10-31T00:00:00'}\n"
+                       '\n'
+                       '@timestamp: 2014-10-31T00:00:00\n'
+                       '\n'
+                       '----------------------------------------\n'
+                       'Opsgenie Details\n'
+                       '\n'
+                       "{'@timestamp': '2014-10-31T00:00:00'}\n"
+                       '\n'
+                       '@timestamp: 2014-10-31T00:00:00\n'
+                       '\n'
+                       '----------------------------------------\n',
+        'details': {'Foo': 'Bar'},
+        'message': 'ElastAlert: Opsgenie Details',
+        'priority': None,
+        'source': 'ElastAlert',
+        'tags': ['ElastAlert', 'Opsgenie Details'],
+        'user': 'genies'
+    }
+    actual_json = mock_post_request.call_args_list[0][1]['json']
+    assert expected_json == actual_json
+
+
+def test_opsgenie_source_blank(caplog):
+    caplog.set_level(logging.INFO)
+    rule = {
+        'name': 'testOGalert',
+        'opsgenie_key': 'ogkey',
+        'opsgenie_addr': 'https://api.opsgenie.com/v2/alerts',
+        'opsgenie_source': '',
+        'type': mock_rule()
+    }
+    with mock.patch('requests.post') as mock_post:
+        rep = requests
+        rep.status_code = 202
+        mock_post.return_value = rep
+
+        alert = OpsGenieAlerter(rule)
+        alert.alert([{'@timestamp': '2014-10-31T00:00:00'}])
+        print(("mock_post: {0}".format(mock_post._mock_call_args_list)))
+        mcal = mock_post._mock_call_args_list
+
+        print(('mcal: {0}'.format(mcal[0])))
+        assert mcal[0][0][0] == ('https://api.opsgenie.com/v2/alerts')
+
+        assert mock_post.called
+
+        assert mcal[0][1]['headers']['Authorization'] == 'GenieKey ogkey'
+        user, level, message = caplog.record_tuples[0]
+        assert "Error response from https://api.opsgenie.com/v2/alerts \n API Response: <MagicMock name='post()' id=" not in message
+        assert ('elastalert', logging.INFO, 'Alert sent to OpsGenie') == caplog.record_tuples[0]
+
+
+def test_opsgenie_parse_responders(caplog):
+    caplog.set_level(logging.WARNING)
+    rule = {
+        'name': 'testOGalert',
+        'opsgenie_key': 'ogkey',
+        'opsgenie_account': 'genies',
+        'opsgenie_addr': 'https://api.opsgenie.com/v2/alerts',
+        'opsgenie_recipients': ['{RECEIPIENT_PREFIX}'],
+        'opsgenie_recipients_args': {'RECEIPIENT_PREFIX': 'recipient'},
+        'type': mock_rule(),
+        'filter': [{'query': {'query_string': {'query': '*hihi*'}}}],
+        'alert': 'opsgenie',
+        'opsgenie_teams': ['{TEAM_PREFIX}-Team'],
+        'opsgenie_teams_args': {'TEAM_PREFIX': 'team'},
+        'opsgenie_default_teams': ["Test"]
+    }
+    match = [
+        {
+            '@timestamp': '2014-10-10T00:00:00',
+            'sender_ip': '1.1.1.1',
+            'hostname': 'aProbe'
+        },
+        {
+            '@timestamp': '2014-10-10T00:00:00',
+            'sender_ip': '1.1.1.1',
+            'hostname2': 'aProbe'
+        }
+    ]
+    with mock.patch('requests.post'):
+        alert = OpsGenieAlerter(rule)
+        alert.alert([{'@timestamp': '2014-10-31T00:00:00', 'team': "Test"}])
+        actual = alert._parse_responders(
+            rule['opsgenie_teams'],
+            rule['opsgenie_teams_args'],
+            match,
+            rule['opsgenie_default_teams']
+        )
+    excepted = ['Test']
+    assert excepted == actual
+    user, level, message = caplog.record_tuples[0]
+    assert logging.WARNING == level
+    assert "Cannot create responder for OpsGenie Alert. Key not foud: 'RECEIPIENT_PREFIX'." in message
+    user, level, message = caplog.record_tuples[1]
+    assert logging.WARNING == level
+    assert 'no responders can be formed. Trying the default responder' in message
+    user, level, message = caplog.record_tuples[2]
+    assert logging.WARNING == level
+    assert 'default responder not set. Falling back' in message
+    user, level, message = caplog.record_tuples[3]
+    assert logging.WARNING == level
+    assert "Cannot create responder for OpsGenie Alert. Key not foud: 'TEAM_PREFIX'." in message
+    user, level, message = caplog.record_tuples[4]
+    assert logging.WARNING == level
+    assert 'no responders can be formed. Trying the default responder' in message
+
+
+def test_opsgenie_create_custom_title():
+    rule = {
+        'name': 'Opsgenie Details',
+        'type': mock_rule(),
+        'opsgenie_account': 'genies',
+        'opsgenie_key': 'ogkey',
+        'opsgenie_details': {
+            'Message': {'field': 'message'},
+            'Missing': {'field': 'missing'}
+        },
+        'Testing': 'abc',
+        'opsgenie_subject': '{} {} {}',
+        'opsgenie_subject_args': ['Testing', 'message', '@timestamp']
+    }
+    match = [
+        {
+            'message': 'Testing',
+            '@timestamp': '2014-10-31T00:00:00'
+        },
+        {
+            'message': 'Testing',
+            '@timestamp': '2014-10-31T00:00:00'
+        }
+    ]
+    alert = OpsGenieAlerter(rule)
+    actual = alert.create_custom_title(match)
+    excepted = 'abc Testing 2014-10-31T00:00:00'
+    assert excepted == actual
+
+
+def test_opsgenie_create_custom_description():
+    rule = {
+        'name': 'Opsgenie Details',
+        'type': mock_rule(),
+        'opsgenie_account': 'genies',
+        'opsgenie_key': 'ogkey',
+        'opsgenie_description': 'Custom Description',
+        'opsgenie_details': {
+            'Message': {'field': 'message'},
+            'Missing': {'field': 'missing'}
+        },
+        'opsgenie_subject': 'test1'
+    }
+    match = {
+        'message': 'Testing',
+        '@timestamp': '2014-10-31T00:00:00'
+    }
+    alert = OpsGenieAlerter(rule)
+
+    with mock.patch('requests.post') as mock_post_request:
+        alert.alert([match])
+
+    mock_post_request.assert_called_once_with(
+        'https://api.opsgenie.com/v2/alerts',
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': 'GenieKey ogkey'
+        },
+        json=mock.ANY,
+        proxies=None
+    )
+
+    expected_json = {
+        'description': 'Custom Description',
+        'details': {'Message': 'Testing'},
+        'message': 'test1',
+        'priority': None,
+        'source': 'ElastAlert',
+        'tags': ['ElastAlert', 'Opsgenie Details'],
+        'user': 'genies'
+    }
+    actual_json = mock_post_request.call_args_list[0][1]['json']
+    assert expected_json == actual_json
+
+
+def test_opsgenie_get_details():
+    rule = {
+        'name': 'Opsgenie Details',
+        'type': mock_rule(),
+        'opsgenie_account': 'genies',
+        'opsgenie_key': 'ogkey',
+        'opsgenie_details': {
+            'Message': {'field': 'message'},
+            'Missing': {'field': 'missing'},
+            'cde': {'field2': 'ok'},
+            'abc': 'test',
+            'f': 1
+        },
+        'Testing': 'abc',
+        'opsgenie_subject': '{} {} {}',
+        'opsgenie_subject_args': ['Testing', 'message', '@timestamp']
+    }
+    match = [
+        {
+            'message': 'Testing',
+            '@timestamp': '2014-10-31T00:00:00'
+        },
+        {
+            'message': 'Testing',
+            '@timestamp': '2014-10-31T00:00:00'
+        }
+    ]
+    alert = OpsGenieAlerter(rule)
+    actual = alert.get_details(match)
+    excepted = {'Message': 'Testing', 'abc': 'test'}
+    assert excepted == actual
+
+
+def test_opsgenie_get_details2():
+    rule = {
+        'name': 'Opsgenie Details',
+        'type': mock_rule(),
+        'opsgenie_account': 'genies',
+        'opsgenie_key': 'ogkey',
+        'Testing': 'abc',
+        'opsgenie_subject': '{} {} {}',
+        'opsgenie_subject_args': ['Testing', 'message', '@timestamp']
+    }
+    match = [
+        {
+            'message': 'Testing',
+            '@timestamp': '2014-10-31T00:00:00'
+        },
+        {
+            'message': 'Testing',
+            '@timestamp': '2014-10-31T00:00:00'
+        }
+    ]
+    alert = OpsGenieAlerter(rule)
+    actual = alert.get_details(match)
+    excepted = {}
+    assert excepted == actual
