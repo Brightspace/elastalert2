@@ -26,6 +26,8 @@ Rule Configuration Cheat Sheet
 +--------------------------------------------------------------+           |
 | ``alert`` (string or list)                                   |           |
 +--------------------------------------------------------------+-----------+
+| ``es_hosts`` (list, no default)                              |           |
++--------------------------------------------------------------+           |
 | ``name`` (string, defaults to the filename)                  |           |
 +--------------------------------------------------------------+           |
 | ``use_strftime_index`` (boolean, default False)              |  Optional |
@@ -227,6 +229,7 @@ es_host
 
 ``es_host``: The hostname of the Elasticsearch cluster the rule will use to query. (Required, string, no default)
 The environment variable ``ES_HOST`` will override this field.
+For multiple host Elasticsearch clusters see ``es_hosts`` parameter.
 
 es_port
 ^^^^^^^
@@ -261,6 +264,11 @@ or loaded from a module. For loading from a module, the alert should be specifie
 
 Optional Settings
 ~~~~~~~~~~~~~~~~~
+es_hosts
+^^^^^^^^
+
+``es_hosts``: The list of nodes of the Elasticsearch cluster that the rule will use for the request. (Optional, list, default none). Values can be specified as ``host:port`` if overriding the default port.
+The environment variable ``ES_HOSTS`` will override this field, and can be specified as a comma-separated value. Note that the ``es_host`` parameter must still be specified in order to identify a primary Elasticsearch host. 
 
 import
 ^^^^^^
@@ -2009,7 +2017,7 @@ Required:
 
 Optional:
 
-``discord_emoji_title``: By default ElastAlert 2 will use the ``:warning:`` emoji when posting to the channel. You can use a different emoji per ElastAlert 2 rule. Any Apple emoji can be used, see http://emojipedia.org/apple/ . If slack_icon_url_override parameter is provided, emoji is ignored.
+``discord_emoji_title``: By default ElastAlert 2 will use the ``:warning:`` emoji when posting to the channel. You can use a different emoji per ElastAlert 2 rule. Any Apple emoji can be used, see http://emojipedia.org/apple/ . If discord_embed_icon_url parameter is provided, emoji is ignored.
 
 ``discord_proxy``: By default ElastAlert 2 will not use a network proxy to send notifications to Discord. Set this option using ``hostname:port`` if you need to use a proxy. only supports https.
 
@@ -2208,6 +2216,47 @@ Example usage::
       apikey: abc123
     http_post_headers:
       authorization: Basic 123dr3234
+
+HTTP POST 2
+~~~~~~~~~~~
+
+This alert type will send results to a JSON endpoint using HTTP POST. The key names are configurable so this is compatible with almost any endpoint. By default, the JSON will contain all the items from the match, unless you specify http_post_payload, in which case it will only contain those items.
+This alert is a more flexible version of the HTTP Post alerter.
+
+Required:
+
+``http_post2_url``: The URL to POST.
+
+Optional:
+
+``http_post2_payload``: List of keys:values to use for the payload of the HTTP Post. You can use {{ field }} (Jinja2 template) in the key and the value to reference any field in the matched events (works for nested fields). If not defined, all the Elasticsearch keys will be sent.  Ex: `"description_{{ my_field }}": "Type: {{ type }}\\nSubject: {{ title }}"`
+
+``http_post2_raw_fields``: List of keys:values to use as the content of the POST. Example - ip:clientip will map the value from the clientip field of Elasticsearch to JSON key named ip. This field overwrite the keys with the same name in `http_post2_payload`.
+
+``http_post2_headers``: List of keys:values to use for as headers of the HTTP Post. You can use {{ field }} (Jinja2 template) in the key and the value to reference any field in the matched events (works for nested fields). Ex: `"Authorization": "{{ user }}"`. Headers `"Content-Type": "application/json"` and `"Accept": "application/json;charset=utf-8"` are present by default, you can overwrite them if you think this is necessary.
+
+``http_post2_proxy``: URL of proxy, if required. only supports https.
+
+``http_post2_all_values``: Boolean of whether or not to include every key value pair from the match in addition to those in http_post2_payload and http_post2_static_payload. Defaults to True if http_post2_payload is not specified, otherwise False.
+
+``http_post2_timeout``: The timeout value, in seconds, for making the post. The default is 10. If a timeout occurs, the alert will be retried next time elastalert cycles.
+
+``http_post2_ca_certs``: Set this option to ``True`` if you want to validate the SSL certificate.
+
+``http_post2_ignore_ssl_errors``: By default ElastAlert 2 will verify SSL certificate. Set this option to ``False`` if you want to ignore SSL errors.
+
+Example usage::
+
+    alert: post2
+    http_post2_url: "http://example.com/api"
+    http_post2_payload:
+      description: "An event came from IP {{clientip}}"
+      username: "{{user.name}}"
+    http_post2_raw_fields:
+      ip: clientip
+    http_post2_headers:
+      authorization: Basic 123dr3234
+      X-custom-type: {{type}}
 
 Jira
 ~~~~
@@ -2841,6 +2890,12 @@ Example slack_attach_kibana_discover_url, slack_kibana_discover_color, slack_kib
 ``slack_author_icon``: An optional URL used to display a 16x16 pixel icon beside the author_name. Defaults to "".
 
 ``slack_msg_pretext``: You can set the message attachment pretext using this option. Defaults to "".
+
+``slack_attach_jira_ticket_url``: Add url to the jira ticket created. Only works if the Jira alert runs before Slack alert. Set the field to ``True`` in order to generate the url. Defaults to ``False``.
+
+``slack_jira_ticket_color``: The color of the Jira Ticket url attachment. Defaults to ``#ec4b98``.
+
+``slack_jira_ticket_title``: The title of the Jira Ticket url attachment. Defaults to ``Jira Ticket``.
 
 Splunk On-Call (Formerly VictorOps)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

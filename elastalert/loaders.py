@@ -23,6 +23,7 @@ import elastalert.alerters.exotel
 import elastalert.alerters.gitter
 import elastalert.alerters.googlechat
 import elastalert.alerters.httppost
+import elastalert.alerters.httppost2
 import elastalert.alerters.line
 import elastalert.alerters.pagertree
 import elastalert.alerters.rocketchat
@@ -111,6 +112,7 @@ class RulesLoader(object):
         'servicenow': elastalert.alerters.servicenow.ServiceNowAlerter,
         'alerta': elastalert.alerters.alerta.AlertaAlerter,
         'post': elastalert.alerters.httppost.HTTPPostAlerter,
+        'post2': elastalert.alerters.httppost2.HTTPPost2Alerter,
         'pagertree': elastalert.alerters.pagertree.PagerTreeAlerter,
         'linenotify': elastalert.alerters.line.LineNotifyAlerter,
         'hivealerter': elastalert.alerters.thehive.HiveAlerter,
@@ -552,6 +554,8 @@ class FileRulesLoader(RulesLoader):
         rule_files = []
         if 'scan_subdirectories' in conf and conf['scan_subdirectories']:
             for ruledir in rule_folders:
+                if not os.path.exists(ruledir):
+                    raise EAException('Specified rule_folder does not exist: %s ' % ruledir)
                 for root, folders, files in os.walk(ruledir, followlinks=True):
                     # Openshift/k8s configmap fix for ..data and ..2021_05..date directories that loop with os.walk()
                     folders[:] = [d for d in folders if not d.startswith('..')]
@@ -602,12 +606,14 @@ class FileRulesLoader(RulesLoader):
         return expanded_imports
 
     def get_rule_file_hash(self, rule_file):
-        rule_file_hash = ''
         if os.path.exists(rule_file):
             with open(rule_file, 'rb') as fh:
                 rule_file_hash = hashlib.sha1(fh.read()).digest()
             for import_rule_file in self.import_rules.get(rule_file, []):
                 rule_file_hash += self.get_rule_file_hash(import_rule_file)
+        else:
+            not_found = 'ENOENT ' + rule_file
+            rule_file_hash = hashlib.sha1(not_found.encode('utf-8')).digest()
         return rule_file_hash
 
     @staticmethod

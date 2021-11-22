@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from base64 import b64encode
 import copy
 import datetime
 import os
@@ -14,7 +15,7 @@ from elastalert.loaders import FileRulesLoader
 from elastalert.loaders import RulesLoader
 from elastalert.util import EAException
 
-test_config = {'rules_folder': 'test_folder',
+test_config = {'rules_folder': './empty_folder_test',
                'run_every': {'minutes': 10},
                'buffer_time': {'minutes': 10},
                'es_host': 'elasticsearch.test',
@@ -168,7 +169,7 @@ def test_load_inline_alert_rule():
 
 
 def test_file_rules_loader_get_names_recursive():
-    conf = {'scan_subdirectories': True, 'rules_folder': 'root'}
+    conf = {'scan_subdirectories': True, 'rules_folder': './empty_folder_test'}
     rules_loader = FileRulesLoader(conf)
     walk_paths = (('root', ['folder_a', 'folder_b'], ('rule.yaml',)),
                   ('root/folder_a', [], ('a.yaml', 'ab.yaml')),
@@ -184,6 +185,16 @@ def test_file_rules_loader_get_names_recursive():
     assert 'root/folder_a/ab.yaml' in paths
     assert 'root/folder_b/b.yaml' in paths
     assert len(paths) == 4
+
+
+def test_file_rules_loader_get_names_invalid_path():
+    conf = {'scan_subdirectories': True, 'rules_folder': './folder_missing#XYZ'}
+    try:
+        # folder missing so FileRulesLoader must throws an error
+        if FileRulesLoader(conf).get_names(conf):
+            assert False
+    except EAException:
+        pass
 
 
 def test_file_rules_loader_get_names():
@@ -478,3 +489,12 @@ def test_get_import_rule():
     }
     result = RulesLoader.get_import_rule('', rule)
     assert 'a' == result
+
+
+def test_get_rule_file_hash_when_file_not_found():
+    test_config_copy = copy.deepcopy(test_config)
+    rules_loader = FileRulesLoader(test_config_copy)
+    hash = rules_loader.get_rule_file_hash('empty_folder_test/file_not_found.yml')
+    assert isinstance(hash, bytes)
+    b64Hash = b64encode(hash).decode('ascii')
+    assert 'zR1Ml8y8S8Z/I5j7b48OH+DJqUw=' == b64Hash

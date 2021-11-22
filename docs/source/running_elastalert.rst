@@ -76,12 +76,11 @@ As a Docker container
 =====================
 
 If you're interested in a pre-built Docker image check out the
-`elastalert2
-<https://hub.docker.com/r/jertel/elastalert2>`_ project on Docker Hub.
+elastalert2 container image on `Docker Hub <https://hub.docker.com/r/jertel/elastalert2>`_ or `GitHub Container Registry <https://github.com/jertel/elastalert2/pkgs/container/elastalert2%2Felastalert2>`_. Both images are published for each release. Use GitHub Container Registry if you are running into Docker Hub usage limits.
 
 Be aware that the ``latest`` tag of the image represents the latest commit into
 the master branch. If you prefer to upgrade more slowly you will need utilize a
-versioned tag, such as ``2.2.2`` instead, or ``2`` if you are comfortable with
+versioned tag, such as ``2.2.3`` instead, or ``2`` if you are comfortable with
 always using the latest released version of ElastAlert 2.
 
 A properly configured config.yaml file must be mounted into the container during
@@ -90,9 +89,17 @@ startup of the container. Use the `example file
 provided as a template, and once saved locally to a file such as
 ``/tmp/elastalert.yaml``, run the container as follows:
 
+via Docker Hub (hub.docker.com)
+
 .. code-block::
 
     docker run -d -v /tmp/elastalert.yaml:/opt/elastalert/config.yaml jertel/elastalert2
+
+via GitHub Container Registry (ghcr.io)
+
+.. code-block::
+
+    docker run -d -v /tmp/elastalert.yaml:/opt/elastalert/config.yaml ghcr.io/jertel/elastalert2/elastalert2
 
 To build the image locally run the following command:
 
@@ -158,11 +165,18 @@ For this tutorial, we will use the ``examples/rules`` folder.
 time each query is run. This value is ignored for rules where
 ``use_count_query`` or ``use_terms_query`` is set to true.
 
-``es_host`` is the address of an Elasticsearch cluster where ElastAlert 2 will
+``es_host`` is the primary address of an Elasticsearch cluster where ElastAlert 2 will
 store data about its state, queries run, alerts, and errors. Each rule may also
-use a different Elasticsearch host to query against.
+use a different Elasticsearch host to query against. For multiple host Elasticsearch 
+clusters see ``es_hosts`` parameter.
 
 ``es_port`` is the port corresponding to ``es_host``.
+
+``es_hosts`` is the list of addresses of the nodes of the Elasticsearch cluster. This
+parameter can be used for high availability purposes, but the primary host must also
+be specified in the ``es_host`` parameter. The ``es_hosts`` parameter can be overridden 
+within each rule. This value can be specified as ``host:port`` if overriding the default 
+port.
 
 ``use_ssl``: Optional; whether or not to connect to ``es_host`` using TLS; set
 to ``True`` or ``False``.
