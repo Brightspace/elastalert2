@@ -15,6 +15,7 @@ env:
 
 jobs:
   push:
+    if: false
     environment: Main
     
     runs-on: ubuntu-latest
