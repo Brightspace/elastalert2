@@ -1,20 +1,20 @@
 
 # ElastAlert 2 Helm Chart for Kubernetes
 
-An ElastAlert 2 helm chart is available in the jertel Helm repository, and can be installed into an existing Kubernetes cluster by following the instructions below.
+An ElastAlert 2 helm chart is available, and can be installed into an existing Kubernetes cluster by following the instructions below.
 
 ## Installing the Chart
 
-Add the jertel repository to your Helm configuration:
+Add the elastalert2 repository to your Helm configuration:
 
 ```console
-helm repo add jertel https://helm.jertel.com
+helm repo add elastalert2 https://jertel.github.io/elastalert2/
 ```
 
 Next, install the chart with a release name, such as _elastalert2_:
 
 ```console
-helm install elastalert2 jertel/elastalert2
+helm install elastalert2 elastalert2/elastalert2
 ```
 
 The command deploys ElastAlert 2 on the Kubernetes cluster in the default configuration. The [configuration](#configuration) section lists the parameters that can be configured during installation.
@@ -47,7 +47,7 @@ The command removes all the Kubernetes components associated with the chart and 
 | Parameter                                    | Description                                                                                                                   | Default                                                  |
 |----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------|
 | `image.repository`                           | docker image                                                                                                                  | jertel/elastalert2                                       |
-| `image.tag`                                  | docker image tag                                                                                                              | 2.2.3                                                    |
+| `image.tag`                                  | docker image tag                                                                                                              | 2.5.1                                                    |
 | `image.pullPolicy`                           | image pull policy                                                                                                             | IfNotPresent                                             |
 | `image.pullSecret`                           | image pull secret                                                                                                             | ""                                                       |
 | `podAnnotations`                             | Annotations to be added to pods                                                                                               | {}                                                       |
@@ -56,6 +56,7 @@ The command removes all the Kubernetes components associated with the chart and 
 | `command`                                    | command override for container                                                                                                | `NULL`                                                   |
 | `args`                                       | args override for container                                                                                                   | `NULL`                                                   |
 | `replicaCount`                               | number of replicas to run                                                                                                     | 1                                                        |
+| `rulesFolder`                                | Locaton of rules directory. Usefull when you have one docker image and different set on rules per environemnt. For example development can reside in `/opt/elastalert/develop` and production in `/opt/elastalert/production`.                                                                                                     | /opt/elastalert/rules                                                       |
 | `elasticsearch.host`                         | elasticsearch endpoint to use                                                                                                 | elasticsearch                                            |
 | `elasticsearch.port`                         | elasticsearch port to use                                                                                                     | 9200                                                     |
 | `elasticsearch.useSsl`                       | whether or not to connect to es_host using SSL                                                                                | False                                                    |
@@ -82,12 +83,18 @@ The command removes all the Kubernetes components associated with the chart and 
 | `serviceAccount.annotations`                 | ServiceAccount annotations                                                                                                    |                                                          |
 | `podSecurityPolicy.create`                   | [DEPRECATED] Create pod security policy resources                                                                             | `false`                                                  |
 | `resources`                                  | Container resource requests and limits                                                                                        | {}                                                       |
+| `rulesVolumeName`                            | Specifies the rules volume to be mounted. Can be changed for mounting a custom rules folder via the extraVolumes parameter, instead of using the default rules configMap or secret rule mounting method.                                                                                 | "rules"                                                  |
 | `rules`                                      | Rule and alert configuration for ElastAlert 2                                                                                 | {} example shown in values.yaml                          |
 | `runIntervalMins`                            | Default interval between alert checks, in minutes                                                                             | 1                                                        |
 | `realertIntervalMins`                        | Time between alarms for same rule, in minutes                                                                                 | `NULL`                                                   |
+| `scanSubdirectories`                        | Enable/disable subdirectory scanning for rules                                                                                 | `true`                                                   |
 | `alertRetryLimitMins`                        | Time to retry failed alert deliveries, in minutes                                                                             | 2880 (2 days)                                            |
 | `bufferTimeMins`                             | Default rule buffer time, in minutes                                                                                          | 15                                                       |
 | `writebackIndex`                             | Name or prefix of elastalert index(es)                                                                                        | elastalert                                               |
 | `nodeSelector`                               | Node selector for deployment                                                                                                  | {}                                                       |
 | `affinity`                                   | Affinity specifications for the deployed pod(s)                                                                               | {}                                                       |
 | `tolerations`                                | Tolerations for deployment                                                                                                    | []                                                       |
+| `smtp_auth.username`                         | Optional SMTP mail server username. If the value is not empty, the smtp_auth secret will be created automatically.       | `NULL`                                                   |
+| `smtp_auth.password`                         | Optional SMTP mail server passwpord. This must be specified if the above field, `smtp_auth.username` is also specified.      | `NULL`                                                   |
+| `prometheusPort`                         | Optional TCP port to be used to expose prometheus metrics. if set: (1) it will pass the start parameter --prometheus_port to the command, (2) it will expose said TCP port on the POD and (3) It will add the pod annotation: prometheus.io/port: value to POD, for prometheus pod service discovery to pick the metrics      | `NULL`                                                   |
+| `prometheusScrapeAnnotations`                         | Optional Dict with the flags used by prometheus SD to know the scrape path and to keep the scrapted metrics. Note that this values are only rendered if prometheusPort is set | prometheusScrapeAnnotations: {prometheus.io/scrape: "true" prometheus.io/path: "/"}                                   |

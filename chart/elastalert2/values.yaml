@@ -7,6 +7,12 @@ revisionHistoryLimit: 5
 # Default internal between alert checks against the elasticsearch datasource, in minutes
 runIntervalMins: 1
 
+# Location of directory where rules reside
+rulesFolder: "/opt/elastalert/rules"
+
+# Enable/disabe subdirectory scanning for rules
+scanSubdirectories: true
+
 # Default rule buffer duration, in minutes
 bufferTimeMins: 15
 
@@ -25,7 +31,7 @@ image:
   # docker image
   repository: jertel/elastalert2
   # docker image tag
-  tag: 2.2.3
+  tag: 2.5.1
   pullPolicy: IfNotPresent
   pullSecret: ""
 
@@ -79,7 +85,6 @@ extraConfigOptions: {}
   # # Options to propagate to all rules, e.g. a common slack_webhook_url or kibana_url
   # # Please note at the time of implementing this value, it will not work for required_locals
   # # Which MUST be set at the rule level, these are: ['alert', 'type', 'name', 'index']
-  # generate_kibana_link: true
   # kibana_url: https://kibana.yourdomain.com
   # slack_webhook_url: dummy
 
@@ -150,7 +155,10 @@ extraConfigOptions: {}
 # command: ["YOUR_CUSTOM_COMMAND"]
 # args: ["YOUR", "CUSTOM", "ARGS"]
 
-# rule configurations e.g. (http://elastalert2.readthedocs.io/en/latest/)
+# specifies the rules volume to be used
+rulesVolumeName: "rules"
+
+# additional rule configurations e.g. (http://elastalert2.readthedocs.io/en/latest/)
 rules: {}
   # deadman_slack: |-
   #   ---
@@ -223,6 +231,11 @@ affinity: {}
 #     effect: "NoSchedule"
 tolerations: []
 
+# Optional automatic SMTP mail server credential management.
+# smtp_auth:
+#   username: ""
+#   password: ""
+
 extraVolumes: []
   # - name: smtp-auth
   #   secret:
@@ -237,3 +250,8 @@ extraVolumeMounts: []
   #   mountPath: /opt/elastalert/config-smtp/smtp_auth.yaml
   #   subPath: smtp_auth.yaml
   #   readOnly: true
+
+# Prometheus Exporter defined by port:
+prometheusScrapeAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: "/"
