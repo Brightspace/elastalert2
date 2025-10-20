@@ -5,7 +5,7 @@ import sys
 
 from sortedcontainers import SortedKeyList as sortedlist
 
-from elastalert.util import (add_raw_postfix, dt_to_ts, EAException, elastalert_logger, elasticsearch_client,
+from elastalert.util import (add_keyword_postfix, dt_to_ts, EAException, elastalert_logger, elasticsearch_client,
                              format_index, hashable, lookup_es_key, new_get_event_ts, pretty_ts, total_seconds,
                              ts_now, ts_to_dt, expand_string_into_dict, format_string)
 
@@ -448,15 +448,16 @@ class SpikeRule(RuleType):
         extending ref/cur value retrieval logic for spike aggregations
         """
         spike_check_type = self.rules.get('metric_agg_type')
-        if spike_check_type in [None, 'sum', 'value_count']:
-            # default count logic is appropriate in all these cases
-            return self.ref_windows[qk].count(), self.cur_windows[qk].count()
-        elif spike_check_type == 'avg':
+        if spike_check_type == 'avg':
             return self.ref_windows[qk].mean(), self.cur_windows[qk].mean()
         elif spike_check_type == 'min':
             return self.ref_windows[qk].min(), self.cur_windows[qk].min()
         elif spike_check_type == 'max':
             return self.ref_windows[qk].max(), self.cur_windows[qk].max()
+ 
+        # default count logic is appropriate in all other cases
+        return self.ref_windows[qk].count(), self.cur_windows[qk].count()
+
 
     def clear_windows(self, qk, event):
         # Reset the state and prevent alerts until windows filled again
@@ -522,7 +523,7 @@ class SpikeRule(RuleType):
     def find_matches(self, ref, cur):
         """ Determines if an event spike or dip happening. """
         # Apply threshold limits
-        if self.field_value is None:
+        if self.field_value is None and cur is not None and ref is not None:
             if (cur < self.rules.get('threshold_cur', 0) or
                     ref < self.rules.get('threshold_ref', 0)):
                 return False
@@ -586,6 +587,14 @@ class FlatlineRule(FrequencyRule):
         # Dictionary mapping query keys to the first events
         self.first_event = {}
 
+    def get_threshold(self, key):
+        return self.rules['threshold']
+
+    def get_event_data(self, key):
+        return {
+            'threshold': self.get_threshold(key)
+        }
+
     def check_for_match(self, key, end=True):
         # This function gets called between every added document with end=True after the last
         # We ignore the calls before the end because it may trigger false positives
@@ -602,10 +611,10 @@ class FlatlineRule(FrequencyRule):
 
         # Match if, after removing old events, we hit num_events
         count = self.occurrences[key].count()
-        if count < self.rules['threshold']:
+        if count < self.get_threshold(key):
             # Do a deep-copy, otherwise we lose the datetime type in the timestamp field of the last event
             event = copy.deepcopy(self.occurrences[key].data[-1][0])
-            event.update(key=key, count=count)
+            event.update(key=key, count=count, **self.get_event_data(key))
             self.add_match(event)
 
             if not self.rules.get('forget_keys'):
@@ -632,11 +641,14 @@ class FlatlineRule(FrequencyRule):
         )
         return message
 
+    def get_keys(self):
+        return list(self.occurrences.keys())
+
     def garbage_collect(self, ts):
         # We add an event with a count of zero to the EventWindow for each key. This will cause the EventWindow
         # to remove events that occurred more than one `timeframe` ago, and call onRemoved on them.
         default = ['all'] if 'query_key' not in self.rules else []
-        for key in list(self.occurrences.keys()) or default:
+        for key in self.get_keys() or default:
             self.occurrences.setdefault(
                 key,
                 EventWindow(self.rules['timeframe'], getTimestamp=self.get_ts)
@@ -714,7 +726,7 @@ class NewTermsRule(RuleType):
                 # Iterate on each part of the composite key and add a sub aggs clause to the elastic search query
                 for i, sub_field in enumerate(field):
                     if self.rules.get('use_keyword_postfix', True):
-                        level['values']['terms']['field'] = add_raw_postfix(sub_field, self.is_five_or_above())
+                        level['values']['terms']['field'] = add_keyword_postfix(sub_field)
                     else:
                         level['values']['terms']['field'] = sub_field
                     if i < len(field) - 1:
@@ -725,7 +737,7 @@ class NewTermsRule(RuleType):
                 self.seen_values.setdefault(field, [])
                 # For non-composite keys, only a single agg is needed
                 if self.rules.get('use_keyword_postfix', True):
-                    field_name['field'] = add_raw_postfix(field, self.is_five_or_above())
+                    field_name['field'] = add_keyword_postfix(field)
                 else:
                     field_name['field'] = field
 
@@ -917,15 +929,6 @@ class NewTermsRule(RuleType):
                         self.add_match(match)
                         self.seen_values[field].append(bucket['key'])
 
-    def is_five_or_above(self):
-        esinfo = self.es.info()['version']
-        if esinfo.get('distribution') == "opensearch":
-            # OpenSearch is based on Elasticsearch 7.10.2, currently only v1.0.0 exists
-            # https://opensearch.org/
-            return True
-        else:
-            return int(esinfo['number'][0]) >= 5
-
 
 class CardinalityRule(RuleType):
     """ A rule that matches if cardinality of a field is above or below a threshold within a timeframe """
@@ -1106,10 +1109,13 @@ class MetricAggregationRule(BaseAggregationRule):
                 metric_val = aggregation_data[self.metric_key]['value']
             if self.crossed_thresholds(metric_val):
                 match = {self.rules['timestamp_field']: timestamp,
-                         self.metric_key: metric_val}
+                         self.metric_key: metric_val,
+                         'metric_agg_value': metric_val
+                         }
                 metric_format_string = self.rules.get('metric_format_string', None)
                 if metric_format_string is not None:
                     match[self.metric_key +'_formatted'] = format_string(metric_format_string, metric_val)
+                    match['metric_agg_value_formatted'] = format_string(metric_format_string, metric_val)
                 if query_key is not None:
                     match = expand_string_into_dict(match, self.rules['query_key'], query_key)
                 self.add_match(match)
@@ -1140,6 +1146,10 @@ class MetricAggregationRule(BaseAggregationRule):
                     # add compound key to payload to allow alerts to trigger for every unique occurence
                     compound_value = [match_data[key] for key in self.rules['compound_query_key']]
                     match_data[self.rules['query_key']] = ",".join([str(value) for value in compound_value])
+                    metric_format_string = self.rules.get('metric_format_string', None)
+                    if metric_format_string:
+                        match_data[self.metric_key +'_formatted'] = format_string(metric_format_string, metric_val)
+                        match_data['metric_agg_value_formatted'] = format_string(metric_format_string, metric_val)
                     self.add_match(match_data)
 
     def crossed_thresholds(self, metric_value):

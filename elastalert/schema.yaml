@@ -6,10 +6,15 @@ definitions:
     type: [string, array]
     items: {type: string}
 
-  # Either a single string OR an array of strings OR an array of ararys
+  # Either a single string OR an array of strings OR an array of arrays
   arrayOfStringsOrOtherArrays: &arrayOfStringsOrOtherArray
     type: [string, array]
     items: {type: [string, array]}
+
+  # Either a single string OR an array of strings OR an array of objects
+  stringOrArrayOfStringsOrObjects: &stringOrArrayOfStringsOrObjects
+    type: [string, array]
+    items: {type: [string, object]}
 
   timedelta: &timedelta
     type: object
@@ -46,6 +51,28 @@ definitions:
     type: array
     items: *slackField
 
+  msTeamsFact: &msTeamsFact
+    type: object
+    additionalProperties: false
+    properties:
+      name: {type: string}
+      value: {type: string}
+
+  msPowerAutomateFact: &msPowerAutomateFact
+    type: object
+    additionalProperties: false
+    properties:
+      name: {type: string}
+      value: {type: string}
+
+  arrayOfMsTeamsFacts: &arrayOfMsTeamsFacts
+    type: array
+    items: *msTeamsFact
+
+  arrayOfMsPowerAutomateFacts: &arrayOfMsPowerAutomateFacts
+    type: array
+    items: *msPowerAutomateFact
+
   mattermostField: &mattermostField
     type: object
     additionalProperties: false
@@ -60,6 +87,28 @@ definitions:
     items: *mattermostField
 
   filter: &filter {}
+
+  irisIocField: &irisIocField
+    type: object
+    additionalProperties: false
+    properties:
+      ioc_value: {type: string}
+      ioc_description: {type: string}
+      ioc_tlp_id: {type: integer, enum: [1, 2, 3]}
+      ioc_type_id: {type: integer}
+      ioc_tags: {type: string}
+
+  arrayOfIrisIocFields: &arrayOfIrisIocFields
+    type: array
+    items: *irisIocField
+  
+  opsGenieArgs: &opsGenieArgs
+    type: object
+    additionalProperties: false
+    minProperties: 0
+    patternProperties:
+      "^.+$":
+        type: string
 
 required: [type, index, alert]
 type: object
@@ -100,7 +149,6 @@ oneOf:
       num_events: {type: integer}
       timeframe: *timeframe
       use_count_query: {type: boolean}
-      doc_type: {type: string}
       use_terms_query: {type: boolean}
       terms_size: {type: integer}
       attach_related: {type: boolean}
@@ -113,12 +161,12 @@ oneOf:
       spike_type: {enum: ["up", "down", "both"]}
       timeframe: *timeframe
       use_count_query: {type: boolean}
-      doc_type: {type: string}
       use_terms_query: {type: boolean}
       terms_size: {type: integer}
       alert_on_new_data: {type: boolean}
       threshold_ref: {type: integer}
       threshold_cur: {type: integer}
+      field_value: {type: string}
 
   - title: Spike Aggregation
     required: [spike_height, spike_type, timeframe]
@@ -129,7 +177,6 @@ oneOf:
       metric_agg_type: {enum: ["min", "max", "avg", "sum", "cardinality", "value_count", "percentiles"]}
       timeframe: *timeframe
       use_count_query: {type: boolean}
-      doc_type: {type: string}
       use_terms_query: {type: boolean}
       terms_size: {type: integer}
       alert_on_new_data: {type: boolean}
@@ -145,7 +192,9 @@ oneOf:
       timeframe: *timeframe
       threshold: {type: integer}
       use_count_query: {type: boolean}
-      doc_type: {type: string}
+      use_terms_query: {type: boolean}
+      terms_size: {type: integer}
+      forget_keys: {type: boolean}
 
   - title: New Term
     required: []
@@ -156,6 +205,8 @@ oneOf:
       alert_on_missing_field: {type: boolean}
       use_terms_query: {type: boolean}
       terms_size: {type: integer}
+      window_step_size: *timeframe
+      use_keyword_postfix: {type: boolean}
 
   - title: Cardinality
     required: [cardinality_field, timeframe]
@@ -171,13 +222,28 @@ oneOf:
     properties:
       type: {enum: [metric_aggregation]}
       metric_agg_type: {enum: ["min", "max", "avg", "sum", "cardinality", "value_count", "percentiles"]}
-      #timeframe: *timeframe
       percentile_range: {type: integer}
+      max_threshold: {type: number}
+      min_threshold: {type: number}
+      min_doc_count: {type: integer}
+      use_run_every_query_size: {type: boolean}
+      allow_buffer_time_overlap: {type: boolean}
+      bucket_interval: *timeframe
+      sync_bucket_interval: {type: boolean}
+      metric_format_string: {type: string}
 
   - title: Percentage Match
     required: [match_bucket_filter]
     properties:
       type: {enum: [percentage_match]}
+      min_percentage: {type: number}
+      max_percentage: {type: number}
+      use_run_every_query_size: {type: boolean}
+      allow_buffer_time_overlap: {type: boolean}
+      bucket_interval: *timeframe
+      sync_bucket_interval: {type: boolean}
+      percentage_format_string: {type: string}
+      min_denominator: {type: integer}
 
   - title: Custom Rule from Module
     properties:
@@ -208,7 +274,9 @@ properties:
           type: string
       - type: string
   aggregation: *timeframe
+  aggregation_alert_time_compared_with_timestamp_field: {type: boolean}
   realert: *timeframe
+  realert_key: {type: string}
   exponential_realert: *timeframe
 
   buffer_time: *timeframe
@@ -222,32 +290,34 @@ properties:
   priority: {type: integer}
 
   filter :
-    type: [array, object]
+    type: array
     items: *filter
-    additionalProperties: false
-    properties:
-        download_dashboard: {type: string}
 
   include: {type: array, items: {type: string}}
+  include_fields: {type: array, item: {type: string}}
+  include_rule_params_in_matches: {type: array, items: {type: string}}
+  include_rule_params_in_first_match_only: {type: boolean}
   top_count_keys: {type: array, items: {type: string}}
   top_count_number: {type: integer}
   raw_count_keys: {type: boolean}
-  generate_kibana_link: {type: boolean}
-  kibana_dashboard: {type: string}
   kibana_url: {type: string, format: uri}
   kibana_username: {type: string}
   kibana_password: {type: string}
-  use_kibana_dashboard: {type: string}
+  kibana_verify_certs: {type: boolean}
   use_local_time: {type: boolean}
   custom_pretty_ts_format: {type: string}
   match_enhancements: {type: array, items: {type: string}}
   query_key: *arrayOfString
   replace_dots_in_field_names: {type: boolean}
   scan_entire_timeframe: {type: boolean}
+  
+  ## System Error Notifications
+  notify_alert: *stringOrArrayOfStringsOrObjects
+  notify_all_errors: {type: boolean}
 
   ### summary table
   summary_table_fields: {type: array, items: {type: string}}
-  summary_table_type: {type: string, enum: ['ascii', 'markdown']}
+  summary_table_type: {type: string, enum: ['ascii', 'html', 'markdown']}
   summary_table_max_rows: {type: integer, minimum: 0}
   summary_prefix: {type: string}
   summary_suffix: {type: string}
@@ -256,13 +326,23 @@ properties:
   generate_kibana_discover_url: {type: boolean}
   shorten_kibana_discover_url: {type: boolean}
   kibana_discover_app_url: {type: string}
-  kibana_discover_version: {type: string, enum: ['7.15', '7.14', '7.13', '7.12', '7.11', '7.10', '7.9', '7.8', '7.7', '7.6', '7.5', '7.4', '7.3', '7.2', '7.1', '7.0', '6.8', '6.7', '6.6', '6.5', '6.4', '6.3', '6.2', '6.1', '6.0', '5.6']}
+  kibana_discover_version: {type: string}
   kibana_discover_index_pattern_id: {type: string, minLength: 1}
   kibana_discover_columns: {type: array, items: {type: string, minLength: 1}, minItems: 1}
   kibana_discover_from_timedelta: *timedelta
   kibana_discover_to_timedelta: *timedelta
   kibana_discover_security_tenant: {type:string}
 
+  ### Opensearch discover App Link
+  generate_opensearch_discover_url: {type: boolean}
+  opensearch_url: {type: string, format: uri}
+  opensearch_discover_app_url: {type: string}
+  opensearch_discover_version: {type: string}
+  opensearch_discover_index_pattern_id: {type: string, minLength: 1}
+  opensearch_discover_columns: {type: array, items: {type: string, minLength: 1}, minItems: 1}
+  opensearch_discover_from_timedelta: *timedelta
+  opensearch_discover_to_timedelta: *timedelta
+  
   # Alert Content
   alert_text: {type: string} # Python format string
   alert_text_args: {type: array, items: {type: string}}
@@ -271,10 +351,6 @@ properties:
   alert_missing_value: {type: string}
   timestamp_field: {type: string}
   field: {}
-
-  ### Simple
-  simple_webhook_url: *arrayOfString
-  simple_proxy: {type: string}
 
   ### Alerta
   alerta_api_url: {type: string}
@@ -299,14 +375,16 @@ properties:
   alerta_attributes_values: {type: array, items: {type: string}}  # Python format string
 
   ### Alertmanager
+  alertmanager_alertname: {type: string}
   alertmanager_hosts: {type: array, items: {type: string}}
   alertmanager_api_version: {type: string, enum: ['v1', 'v2']}
   alertmanager_alert_subject_labelname: {type: string}
   alertmanager_alert_text_labelname: {type: string}
   alertmanager_proxy: {type: string}
-  alertmanager_ca_certs: {type: boolean}
+  alertmanager_ca_certs: {type: [boolean, string]}
   alertmanager_ignore_ssl_errors: {type: boolean}
   alertmanager_timeout: {type: integer}
+  alertmanager_resolve_time: *timedelta
   alertmanager_basic_auth_login: {type: string}
   alertmanager_basic_auth_password: {type: string}
   alertmanager_labels:
@@ -390,6 +468,7 @@ properties:
   dingtalk_proxy: {type: string}
   dingtalk_proxy_login: {type: string}
   dingtalk_proxy_pass: {type: string}
+  dingtalk_sign: {type: string}
 
   ## Discord
   discord_webhook_url: {type: string}
@@ -426,11 +505,46 @@ properties:
   exotel_auth_token: {type: string}
   exotel_to_number: {type: string}
   exotel_from_number: {type: string}
+  exotel_message_body: {type: string}
 
   ### Gitter
   gitter_webhook_url: {type: string}
   gitter_msg_level: {enum: [info, error]}
   gitter_proxy: {type: string}
+
+  ### Gelf
+  gelf_type: {type: string, enum: ['http', 'tcp']}
+  gelf_endpoint: {type: string}
+  gelf_host: {type: string}
+  gelf_port: {type: integer}
+  gelf_payload:
+    type: object
+    minProperties: 1
+    patternProperties:
+      "^.+$":
+        oneOf:
+          - type: string
+          - type: object
+            additionalProperties: false
+            required: [field]
+            properties:
+              field: {type: string, minLength: 1}
+  gelf_log_level: {type: integer, enum: ['0', 1', '2', '3', '4', '5', '6', '7']}
+  gelf_http_headers:
+    type: object
+    minProperties: 1
+    patternProperties:
+      "^.+$":
+        oneOf:
+          - type: string
+          - type: object
+            additionalProperties: false
+            required: [ field ]
+            properties:
+              field: { type: string, minLength: 1 }
+  gelf_ca_cert: {type: [boolean, string]}
+  gelf_http_ignore_ssl_errors: {type: boolean}
+  gelf_timeout: {type: integer}
 
   ### GoogleChat
   googlechat_webhook_url: *arrayOfString
@@ -439,20 +553,85 @@ properties:
   googlechat_header_subtitle: {type: string}
   googlechat_header_image: {type: string}
   googlechat_footer_kibanalink: {type: string}
+  googlechat_proxy: {type: string}
 
   ### HTTP POST
   http_post_url: *arrayOfString
   http_post_proxy: {type: string}
-  http_post_ca_certs: {type: boolean}
+  http_post_ca_certs: {type: [boolean, string]}
   http_post_ignore_ssl_errors: {type: boolean}
   http_post_timeout: {type: integer}
 
   ### HTTP POST 2
   http_post2_url: *arrayOfString
-  http_post2_proxy: { type: string }
-  http_post2_ca_certs: { type: boolean }
-  http_post2_ignore_ssl_errors: { type: boolean }
-  http_post2_timeout: { type: integer }
+  http_post2_proxy: {type: string}
+  http_post2_ca_certs: {type: [boolean, string]}
+  http_post2_ignore_ssl_errors: {type: boolean}
+  http_post2_timeout: {type: integer}
+
+  ### INDEXER
+  indexer_alerts_name: {type: string}
+  indexer_config: {type: string}
+  indexer_connection:
+    type: object
+    properties:
+      es_host: {type: string}
+      es_hosts: {type: array, items: {type: string}}
+      es_port: {type: integer}
+      ssl_show_warn: {type: boolean}
+      use_ssl: {type: boolean}
+      verify_certs: {type: boolean}
+      ca_cert: {type: string}
+      es_username: {type: string}
+      es_password: {type: string}
+      index_alerts_name: {type: string}
+  indexer_alert_config:
+    type: object
+    minProperties: 1
+    patternProperties:
+      "^.+$":
+        oneOf:
+          - type: [boolean, string, integer]
+          - type: array
+            items:
+                type: object
+                properties:
+                  name: { type: string , minLength: 1 }
+                  value: { type: [boolean, string, integer] , minLength: 1 }
+                  "^.+$": { type: [boolean, string, integer], minLength: 1 }
+          - type: object
+            properties:
+              "^.+$": { type: [boolean, string, integer], minLength: 1 }
+
+  ### IRIS
+  iris_host: {type: string}
+  iris_api_token: {type: string}
+  iris_type: {type: string, enum: ['alert', 'case']}
+  iris_customer_id: {type: integer}
+  iris_ignore_ssl_errors: {type: boolean}
+  iris_ca_cert: {type: [boolean, string]}
+  iris_overwrite_timestamp: {type: boolean}
+  iris_case_template_id: {type: integer}
+  iris_description: {type: string}
+  iris_alert_note: {type: string}
+  iris_alert_tags: {type: string}
+  iris_alert_status_id: {type: integer, enum: [1, 2, 3, 4, 5, 6, 7]}
+  iris_alert_source: {type: string}
+  iris_alert_source_link: {type: string}
+  iris_alert_severity_id: {type: integer, enum: [1, 2, 3, 4, 5, 6]}
+  iris_iocs: *arrayOfIrisIocFields
+  iris_alert_context:
+    type: object
+    minProperties: 1
+    patternProperties:
+      "^.+$":
+        oneOf:
+          - type: string
+          - type: object
+            additionalProperties: false
+            required: [ field ]
+            properties:
+              field: { type: string, minLength: 1 }
 
   ### Jira
   jira_server: {type: string}
@@ -473,18 +652,30 @@ properties:
   jira_bump_not_in_statuses: *arrayOfString
   jira_bump_in_statuses: *arrayOfString
   jira_bump_only: {type: boolean}
-  jira_transition_to: {type: boolean}
+  jira_transition_to: {type: string}
   jira_bump_after_inactivity: {type: number}
 
-  ### Line Notify
-  linenotify_access_token: {type: string}
+  ### Lark
+  lark_bot_id: { type: string }
+  lark_msgtype: { type: string, enum: [ 'text' ] }
+
+  ### Matrix Hookshot
+  matrixhookshot_ca_certs: {type: [boolean, string]}
+  matrixhookshot_webhook_url: *arrayOfString
+  matrixhookshot_username: {type: string}
+  matrixhookshot_html: {type: string}
+  matrixhookshot_text: {type: string}
+  matrixhookshot_proxy: {type: string}
+  matrixhookshot_ignore_ssl_errors: {type: boolean}
+  matrixhookshot_timeout: {type: integer}
 
   ### Mattermost
   mattermost_webhook_url: *arrayOfString
   mattermost_proxy: {type: string}
   mattermost_ignore_ssl_errors: {type: boolean}
   mattermost_username_override: {type: string}
-  mattermost_channel_override: {type: string}
+  mattermost_channel_override: *arrayOfString
+  mattermost_emoji_override: {type: string}
   mattermost_icon_url_override: {type: string}
   mattermost_msg_pretext: {type: string}
   mattermost_msg_color: {enum: [good, warning, danger]}
@@ -498,9 +689,13 @@ properties:
   mattermost_author_name: {type: string}
   mattermost_author_link: {type: string}
   mattermost_author_icon: {type: string}
-  mattermost_attach_kibana_discover_url {type: boolean}
-  mattermost_kibana_discover_color {type: string}
-  mattermost_kibana_discover_title {type: string}
+  mattermost_attach_kibana_discover_url: {type: boolean}
+  mattermost_kibana_discover_color: {type: string}
+  mattermost_kibana_discover_title: {type: string}
+  mattermost_attach_opensearch_discover_url: {type: boolean}
+  mattermost_opensearch_discover_color: {type: string}
+  mattermost_opensearch_discover_title: {type: string}
+
 
   ### Microsoft Teams
   ms_teams_webhook_url: *arrayOfString
@@ -508,19 +703,40 @@ properties:
   ms_teams_theme_color: {type: string}
   ms_teams_proxy: {type: string}
   ms_teams_alert_fixed_width: {type: boolean}
+  ms_teams_alert_facts: *arrayOfMsTeamsFacts
+  ms_teams_attach_kibana_discover_url: {type: boolean}
+  ms_teams_kibana_discover_title: {type: string}
+  ms_teams_ca_certs: {type: [boolean, string]}
+  ms_teams_ignore_ssl_errors: {type: boolean}
+  ms_teams_attach_opensearch_discover_url: {type: boolean}
+  ms_teams_opensearch_discover_title: {type: string}
+
+
+  ### Microsoft Power Automate
+  ms_power_automate_webhook_url: *arrayOfString
+  ms_power_automate_webhook_url_from_field: { type: string }
+  ms_power_automate_alert_summary: {type: string}
+  ms_power_automate_summary_text_size: {type: string, enum: ['default', 'small', 'medium', 'large', 'extraLarge']}
+  ms_power_automate_body_text_size: {type: string, enum: ['default', 'small', 'medium', 'large', 'extraLarge']}
+  ms_power_automate_proxy: {type: string}
+  ms_power_automate_alert_facts: *arrayOfMsPowerAutomateFacts
+  ms_power_automate_kibana_discover_attach_url: {type: boolean}
+  ms_power_automate_kibana_discover_title: {type: string}
+  ms_power_automate_kibana_discover_color: {type: string, enum: ['default', 'positive', 'destructive']}
+  ms_power_automate_ca_certs: {type: [boolean, string]}
+  ms_power_automate_ignore_ssl_errors: {type: boolean}
+  ms_power_automate_opensearch_discover_attach_url: {type: boolean}
+  ms_power_automate_opensearch_discover_title: {type: string}
+  ms_power_automate_opensearch_discover_color: {type: string, enum: ['default', 'positive', 'destructive']}
+  ms_power_automate_teams_card_width_full: {type: boolean}
 
   ### Opsgenie
-  opsgenie_key: {type: string}
   opsgenie_account: {type: string}
   opsgenie_addr: {type: string}
-  opsgenie_description: {type:string}
-  opsgenie_message: {type: string}
   opsgenie_alias: {type: string}
-  opsgenie_subject: {type: string}
-  opsgenie_priority: {type: string}
-  opsgenie_proxy: {type: string}
-  opsgenie_source: {type: string}
-  opsgenie_entity: {type: string}
+  opsgenie_default_recipients: *arrayOfString
+  opsgenie_default_teams: *arrayOfString
+  opsgenie_description: {type:string}
   opsgenie_details:
     type: object
     minProperties: 1
@@ -533,6 +749,20 @@ properties:
             required: [field]
             properties:
               field: {type: string, minLength: 1}
+  opsgenie_entity: {type: string}
+  opsgenie_key: {type: string}
+  opsgenie_message: {type: string}
+  opsgenie_priority: {type: string}
+  opsgenie_proxy: {type: string}
+  opsgenie_recipients_args: *opsGenieArgs
+  opsgenie_recipients: *arrayOfString
+  opsgenie_source: {type: string}
+  opsgenie_subject: {type: string}
+  opsgenie_subject_args: *arrayOfString
+  opsgenie_tags: *arrayOfString
+  opsgenie_teams_args: *opsGenieArgs
+  opsgenie_teams: *arrayOfString
+
 
   ### PagerDuty
   pagerduty_service_key: {type: string}
@@ -541,6 +771,8 @@ properties:
   pagerduty_incident_key: {type: string}
   pagerduty_incident_key_args: {type: array, items: {type: string}}
   pagerduty_proxy: {type: string}
+  pagerduty_ca_certs: {type: [boolean, string]}
+  pagerduty_ignore_ssl_errors: {type: boolean}
   pagerduty_api_version: {type: string, enum: ['v1', 'v2']}
   pagerduty_v2_payload_class: {type: string}
   pagerduty_v2_payload_class_args: {type: array, items: {type: string}}
@@ -565,10 +797,10 @@ properties:
   rocket_chat_msg_color: {enum: [good, warning, danger]}
   rocket_chat_text_string: {type: string}
   rocket_chat_proxy: {type: string}
-  rocket_chat_attach_kibana_discover_url {type: boolean}
-  rocket_chat_kibana_discover_color {type: string}
-  rocket_chat_kibana_discover_title {type: string}
-  rocket_chat_ca_certs: {type: boolean}
+  rocket_chat_attach_kibana_discover_url: {type: boolean}
+  rocket_chat_kibana_discover_color: {type: string}
+  rocket_chat_kibana_discover_title: {type: string}
+  rocket_chat_ca_certs: {type: [boolean, string]}
   rocket_chat_ignore_ssl_errors: {type: boolean}
   rocket_chat_timeout: {type: integer}
 
@@ -586,6 +818,7 @@ properties:
   servicenow_proxy: {type: string}
   servicenow_impact: {type: integer, minimum: 1, maximum: 3}
   servicenow_urgency: {type: integer, minimum: 1, maximum: 3}
+  service_now_additional_fields: {type: object}
 
   ### Slack
   slack_webhook_url: *arrayOfString
@@ -605,10 +838,13 @@ properties:
   slack_attach_kibana_discover_url: {type: boolean}
   slack_kibana_discover_color: {type: string}
   slack_kibana_discover_title: {type: string}
+  slack_attach_opensearch_discover_url: {type: boolean}
+  slack_opensearch_discover_color: {type: string}
+  slack_opensearch_discover_title: {type: string}
   slack_attach_jira_ticket_url: {type: boolean}
   slack_jira_ticket_color: {type: string}
   slack_jira_ticket_title: {type: string}
-  slack_ca_certs: {type: boolean}
+  slack_ca_certs: {type: [boolean, string]}
   slack_footer: {type: string}
   slack_footer_icon: {type: string}
   slack_image_url: {type: string}
@@ -617,6 +853,17 @@ properties:
   slack_author_link: {type: string}
   slack_author_icon: {type: string}
   slack_msg_pretext: {type: string}
+  
+  ### SMSEagle
+  smseagle_url: {type: string}
+  smseagle_token: {type: string}
+  smseagle_message_type: {enum: ['sms', 'ring', 'tts', 'tts_adv']}
+  smseagle_text: {type: string}
+  smseagle_to: *arrayOfString
+  smseagle_contacts: {type: array, items: {type: integer}}
+  smseagle_groups: {type: array, items: {type: integer}}
+  smseagle_duration: {type: integer}
+  smseagle_voice_id: {type: integer}
 
   ### Splunk On-Call (Formerly VictorOps)
   victorops_api_key: {type: string}
@@ -631,7 +878,6 @@ properties:
   stomp_hostport: {type: string}
   stomp_login: {type: string}
   stomp_password: {type: string}
-  stomp_ssl: {type: boolean}
   stomp_destination: {type: string}
 
   ### Telegram
@@ -641,6 +887,8 @@ properties:
   telegram_proxy: {type: string}
   telegram_proxy_login: {type: string}
   telegram_proxy_pass: {type: string}
+  telegram_parse_mode: {type: string, enum: ['markdown', 'markdownV2', 'html']}
+  telegram_thread_id: {type: number}
 
   ### Tencent SMS
   tencent_sms_secret_id: {type: string}
@@ -660,8 +908,38 @@ properties:
   twilio_message_service_sid: {type: string}
   twilio_use_copilot: {type: boolean}
 
+  ### Webex Webhook
+  webex_webhook_id: { type: string }
+  webex_webhook_msgtype: { type: string }
+
+  ### WorkWechat
+  work_wechat_bot_id: { type: string }
+  work_wechat_msgtype: { type: string }
+
   ### Zabbix
   zbx_sender_host: {type: string}
   zbx_sender_port: {type: integer}
+  zbx_host_from_field: {type: boolean}
   zbx_host: {type: string}
   zbx_key: {type: string}
+
+  ### YZJ
+  yzj_token: {type: string}
+  yzj_type: {type: integer, enum: [0]}
+  yzj_custom_loc: {type: string}
+  yzj_proxy: {type: string}
+
+  ### Flashduty
+  flashduty_integration_key: {type: string}
+  flashduty_title: {type: string}
+  flashduty_description: {type: string}
+  flashduty_event_status: {type: string, enum: [Info, Warning, Critical, Ok]}
+  flashduty_alert_key: {type: string}
+  flashduty_check: {type: string}
+  flashduty_service: {type: string}
+  flashduty_cluster: {type: string}
+  flashduty_resource: {type: string}
+  flashduty_metric: {type: string}
+  flashduty_group: {type: string}
+  flashduty_env: {type: string}
+  flashduty_app: {type: string}

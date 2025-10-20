@@ -1,13 +1,20 @@
+OpenSearch
+**********
+
+ElastAlert 2 supports Amazon OpenSearch. In general ElastAlert 2 will auto-detect
+OpenSearch and make adjustments internally to handle the differences between 
+OpenSearch and Elasticsearch.
+
 .. _signingrequests:
 
 Signing requests to Amazon OpenSearch Service
 ================================================
 
-When using Amazon OpenSearch Service, you need to secure your Elasticsearch
-from the outside. Currently, there is no way to secure your Elasticsearch using
-network firewall rules, so the only way is to signing the requests using the
+When using Amazon OpenSearch Service, you need to secure your service
+from unauthorized access. Currently, there is no way to secure this using
+network firewall rules, so the only way is via signing the requests using the
 access key and secret key for a role or user with permissions on the
-Elasticsearch service.
+OpenSearch service.
 
 You can sign requests to AWS using any of the standard AWS methods of providing
 credentials.
@@ -27,7 +34,7 @@ specify the ``aws_region`` in the configuration file or set the
 Using AWS profiles
 ------------------
 
-You can also create a user with permissions on the Elasticsearch service and
+You can also create a user with permissions on the OpenSearch service and
 tell ElastAlert 2 to authenticate itself using that user. First, create an AWS
 profile in the machine where you'd like to run ElastAlert 2 for the user with
 permissions.

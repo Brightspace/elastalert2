@@ -18,6 +18,7 @@ from elastalert.ruletypes import MetricAggregationRule
 from elastalert.ruletypes import NewTermsRule
 from elastalert.ruletypes import PercentageMatchRule
 from elastalert.ruletypes import RuleType
+from elastalert.ruletypes import SpikeMetricAggregationRule
 from elastalert.ruletypes import SpikeRule
 from elastalert.ruletypes import WhitelistRule
 from elastalert.util import dt_to_ts
@@ -250,6 +251,32 @@ def test_spike_deep_key():
     rule = SpikeRule(rules)
     rule.add_data([{'@timestamp': ts_to_dt('2015'), 'foo': {'bar': {'baz': 'LOL'}}}])
     assert 'LOL' in rule.cur_windows
+
+
+def test_spike_no_data():
+    rules = {'threshold_ref': 10,
+             'spike_height': 2,
+             'timeframe': datetime.timedelta(seconds=10),
+             'spike_type': 'both',
+             'timestamp_field': '@timestamp',
+             'query_key': 'foo.bar.baz',
+             'field_value': None}
+    rule = SpikeRule(rules)
+    result = rule.find_matches(1, None)
+    assert not result
+
+
+def test_spike_no_ref_data():
+    rules = {'threshold_ref': 10,
+             'spike_height': 2,
+             'timeframe': datetime.timedelta(seconds=10),
+             'spike_type': 'both',
+             'timestamp_field': '@timestamp',
+             'query_key': 'foo.bar.baz',
+             'field_value': None}
+    rule = SpikeRule(rules)
+    result = rule.find_matches(None, 1)
+    assert not result
 
 
 def test_spike():
@@ -556,14 +583,12 @@ def test_change():
     assert rule.matches == []
 
 
-@pytest.mark.parametrize('version, expected_is_five_or_above', [
-    ({'version': {'number': '2.x.x'}}, False),
-    ({'version': {'number': '5.x.x'}}, True),
-    ({'version': {'number': '6.x.x'}}, True),
+@pytest.mark.parametrize('version', [
     ({'version': {'number': '7.x.x'}}, True),
-    ({'version': {'number': '7.10.2', 'distribution': 'opensearch'}}, True),
+    ({'version': {'number': '1.2.0', 'distribution': 'opensearch'}}, True),
+    ({'version': {'number': '2.0.0', 'distribution': 'opensearch'}}, True),
 ])
-def test_new_term(version, expected_is_five_or_above):
+def test_new_term(version):
     rules = {'fields': ['a', 'b'],
              'timestamp_field': '@timestamp',
              'es_host': 'example.com', 'es_port': 10, 'index': 'logstash',
@@ -584,8 +609,6 @@ def test_new_term(version, expected_is_five_or_above):
 
         mock_es.return_value.search.side_effect = record_args
         rule = NewTermsRule(rules)
-
-    assert rule.is_five_or_above() == expected_is_five_or_above
 
     # 30 day default range, 1 day default step, times 2 fields
     assert rule.es.search.call_count == 60
@@ -633,7 +656,6 @@ def test_new_term(version, expected_is_five_or_above):
     rule.add_data([{'@timestamp': ts_now(), 'a': 'key2'}])
     assert len(rule.matches) == 1
     assert rule.matches[0]['missing_field'] == 'b'
-    assert rule.is_five_or_above() == expected_is_five_or_above
 
 
 def test_new_term_nested_field():
@@ -1177,19 +1199,27 @@ def test_metric_aggregation():
     rule.check_matches(datetime.datetime.now(), None, {'metric_cpu_pct_avg': {'value': 0.966666667}})
     assert '0.966666667' in rule.get_match_str(rule.matches[0])
     assert rule.matches[0]['metric_cpu_pct_avg'] == 0.966666667
+    assert rule.matches[0]['metric_agg_value'] == 0.966666667
     assert 'metric_cpu_pct_avg_formatted' not in rule.matches[0]
+    assert 'metric_agg_value_formatted' not in rule.matches[0]
+
     rules['metric_format_string'] = '{:.2%}'
     rule = MetricAggregationRule(rules)
     rule.check_matches(datetime.datetime.now(), None, {'metric_cpu_pct_avg': {'value': 0.966666667}})
     assert '96.67%' in rule.get_match_str(rule.matches[0])
     assert rule.matches[0]['metric_cpu_pct_avg'] == 0.966666667
+    assert rule.matches[0]['metric_agg_value'] == 0.966666667
     assert rule.matches[0]['metric_cpu_pct_avg_formatted'] == '96.67%'
+    assert rule.matches[0]['metric_agg_value_formatted'] == '96.67%'
+
     rules['metric_format_string'] = '%.2f'
     rule = MetricAggregationRule(rules)
     rule.check_matches(datetime.datetime.now(), None, {'metric_cpu_pct_avg': {'value': 0.966666667}})
     assert '0.97' in rule.get_match_str(rule.matches[0])
     assert rule.matches[0]['metric_cpu_pct_avg'] == 0.966666667
+    assert rule.matches[0]['metric_agg_value'] == 0.966666667
     assert rule.matches[0]['metric_cpu_pct_avg_formatted'] == '0.97'
+    assert rule.matches[0]['metric_agg_value_formatted'] == '0.97'
 
     rules['query_key'] = 'subdict'
     rule = MetricAggregationRule(rules)
@@ -1224,6 +1254,38 @@ def test_metric_aggregation_complex_query_key():
     assert rule.matches[1]['qk'] == 'qk_val'
     assert rule.matches[0]['sub_qk'] == 'sub_qk_val1'
     assert rule.matches[1]['sub_qk'] == 'sub_qk_val2'
+
+
+def test_metric_aggregation_complex_query_key_formatted():
+    rules = {'buffer_time': datetime.timedelta(minutes=5),
+             'timestamp_field': '@timestamp',
+             'metric_agg_type': 'avg',
+             'metric_agg_key': 'some_val',
+             'metric_format_string': '{:.2f}',
+             'compound_query_key': ['qk', 'sub_qk'],
+             'query_key': 'qk,sub_qk',
+             'max_threshold': 0.8}
+
+    query = {"bucket_aggs": {"buckets": [
+        {"metric_some_val_avg": {"value": 1000.9133333}, "key": "sub_qk_val1"},
+        {"metric_some_val_avg": {"value": 10.9}, "key": "sub_qk_val2"},
+        {"metric_some_val_avg": {"value": 0.89999}, "key": "sub_qk_val3"}]
+    }, "key": "qk_val"}
+
+    rule = MetricAggregationRule(rules)
+    rule.check_matches(datetime.datetime.now(), 'qk_val', query)
+    assert len(rule.matches) == 3
+    assert rule.matches[0]['qk'] == 'qk_val'
+    assert rule.matches[1]['qk'] == 'qk_val'
+    assert rule.matches[0]['sub_qk'] == 'sub_qk_val1'
+    assert rule.matches[1]['sub_qk'] == 'sub_qk_val2'
+    assert rule.matches[1]['sub_qk'] == 'sub_qk_val2'
+    assert rule.matches[0]['metric_agg_value_formatted'] == '1000.91'
+    assert rule.matches[0]["metric_some_val_avg_formatted"] == "1000.91"
+    assert rule.matches[1]['metric_agg_value_formatted'] == '10.90'
+    assert rule.matches[1]["metric_some_val_avg_formatted"] == "10.90"
+    assert rule.matches[2]['metric_agg_value_formatted'] == '0.90'
+    assert rule.matches[2]["metric_some_val_avg_formatted"] == "0.90"
 
 
 def test_metric_aggregation_complex_query_key_bucket_interval():
@@ -1397,3 +1459,29 @@ def test_comparerule_compare():
         assert False
     except NotImplementedError:
         assert True
+
+
+def test_spike_percentiles():
+    rules = {'buffer_time': datetime.timedelta(minutes=5),
+             'timeframe': datetime.timedelta(minutes=5),
+             'timestamp_field': '@timestamp',
+             'metric_agg_type': 'percentiles',
+             'metric_agg_key': 'bytes',
+             'percentile_range': 95,
+             'spike_type': 'up',
+             'spike_height': 1.5,
+             'min_threshold': 0.0}
+
+    rule = SpikeMetricAggregationRule(rules)
+
+    payload1 = {"metric_bytes_percentiles": {"values": {"95.0": 0.0}}}
+    timestamp1 = datetime.datetime.now() - datetime.timedelta(minutes=600)
+    data1 = {timestamp1: payload1}
+    rule.add_aggregation_data(data1)
+    assert len(rule.matches) == 0
+
+    payload2 = {"metric_bytes_percentiles": {"values": {"95.0": 9879.0}}}
+    timestamp2 = datetime.datetime.now()
+    data2 = {timestamp2: payload2}
+    rule.add_aggregation_data(data2)
+    assert len(rule.matches) == 1

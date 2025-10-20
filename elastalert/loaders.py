@@ -8,6 +8,7 @@ import sys
 import jsonschema
 import yaml
 import yaml.scanner
+from elastalert.alerters.flashduty import FlashdutyAlerter
 from jinja2 import Environment
 from jinja2 import FileSystemLoader
 from jinja2 import Template
@@ -21,10 +22,12 @@ import elastalert.alerters.dingtalk
 import elastalert.alerters.discord
 import elastalert.alerters.exotel
 import elastalert.alerters.gitter
+import elastalert.alerters.gelf
 import elastalert.alerters.googlechat
 import elastalert.alerters.httppost
 import elastalert.alerters.httppost2
-import elastalert.alerters.line
+import elastalert.alerters.iris
+import elastalert.alerters.lark
 import elastalert.alerters.pagertree
 import elastalert.alerters.rocketchat
 import elastalert.alerters.servicenow
@@ -34,20 +37,27 @@ import elastalert.alerters.telegram
 import elastalert.alerters.thehive
 import elastalert.alerters.twilio
 import elastalert.alerters.victorops
+import elastalert.alerters.webex_webhook
+import elastalert.alerters.workwechat
 from elastalert import alerts
 from elastalert import enhancements
 from elastalert import ruletypes
 from elastalert.alerters.alertmanager import AlertmanagerAlerter
 from elastalert.alerters.email import EmailAlerter
 from elastalert.alerters.jira import JiraAlerter
+from elastalert.alerters.matrixhookshot import MatrixHookshotAlerter
 from elastalert.alerters.mattermost import MattermostAlerter
 from elastalert.alerters.opsgenie import OpsGenieAlerter
 from elastalert.alerters.pagerduty import PagerDutyAlerter
 from elastalert.alerters.slack import SlackAlerter
+from elastalert.alerters.smseagle import SMSEagleAlerter
 from elastalert.alerters.sns import SnsAlerter
 from elastalert.alerters.teams import MsTeamsAlerter
+from elastalert.alerters.powerautomate import MsPowerAutomateAlerter
+from elastalert.alerters.yzj import YzjAlerter
 from elastalert.alerters.zabbix import ZabbixAlerter
 from elastalert.alerters.tencentsms import TencentSMSAlerter
+from elastalert.alerters.indexer import IndexerAlerter
 from elastalert.util import dt_to_ts
 from elastalert.util import dt_to_ts_with_format
 from elastalert.util import dt_to_unix
@@ -106,6 +116,7 @@ class RulesLoader(object):
         'command': elastalert.alerters.command.CommandAlerter,
         'sns': SnsAlerter,
         'ms_teams': MsTeamsAlerter,
+        'ms_power_automate': MsPowerAutomateAlerter,
         'slack': SlackAlerter,
         'mattermost': MattermostAlerter,
         'pagerduty': PagerDutyAlerter,
@@ -120,15 +131,24 @@ class RulesLoader(object):
         'post': elastalert.alerters.httppost.HTTPPostAlerter,
         'post2': elastalert.alerters.httppost2.HTTPPost2Alerter,
         'pagertree': elastalert.alerters.pagertree.PagerTreeAlerter,
-        'linenotify': elastalert.alerters.line.LineNotifyAlerter,
         'hivealerter': elastalert.alerters.thehive.HiveAlerter,
         'zabbix': ZabbixAlerter,
         'discord': elastalert.alerters.discord.DiscordAlerter,
         'dingtalk': elastalert.alerters.dingtalk.DingTalkAlerter,
+        'lark': elastalert.alerters.lark.LarkAlerter,
+        'webex_webhook': elastalert.alerters.webex_webhook.WebexWebhookAlerter,
+        'workwechat': elastalert.alerters.workwechat.WorkWechatAlerter,
         'chatwork': elastalert.alerters.chatwork.ChatworkAlerter,
         'datadog': elastalert.alerters.datadog.DatadogAlerter,
         'ses': elastalert.alerters.ses.SesAlerter,
-        'rocketchat': elastalert.alerters.rocketchat.RocketChatAlerter
+        'rocketchat': elastalert.alerters.rocketchat.RocketChatAlerter,
+        'gelf': elastalert.alerters.gelf.GelfAlerter,
+        'iris': elastalert.alerters.iris.IrisAlerter,
+        'indexer': IndexerAlerter,
+        'matrixhookshot': MatrixHookshotAlerter,
+        'yzj': YzjAlerter,
+        'flashduty': FlashdutyAlerter,
+        'smseagle': SMSEagleAlerter
     }
 
     # A partial ordering of alert types. Relative order will be preserved in the resulting alerts list
@@ -171,7 +191,11 @@ class RulesLoader(object):
                 if rule['name'] in names:
                     raise EAException('Duplicate rule named %s' % (rule['name']))
             except EAException as e:
-                raise EAException('Error loading file %s: %s' % (rule_file, e))
+                if (conf.get('skip_invalid')):
+                    elastalert_logger.error(e)
+                    continue
+                else:
+                    raise EAException('Error loading file %s: %s' % (rule_file, e))
 
             rules.append(rule)
             names.append(rule['name'])
@@ -293,8 +317,6 @@ class RulesLoader(object):
         :param filename: Name of the rule
         :param args: Arguments
         """
-        self.adjust_deprecated_values(rule)
-
         try:
             self.rule_schema.validate(rule)
         except jsonschema.ValidationError as e:
@@ -323,14 +345,14 @@ class RulesLoader(object):
                 rule['bucket_interval_timedelta'] = datetime.timedelta(**rule['bucket_interval'])
             if 'exponential_realert' in rule:
                 rule['exponential_realert'] = datetime.timedelta(**rule['exponential_realert'])
-            if 'kibana4_start_timedelta' in rule:
-                rule['kibana4_start_timedelta'] = datetime.timedelta(**rule['kibana4_start_timedelta'])
-            if 'kibana4_end_timedelta' in rule:
-                rule['kibana4_end_timedelta'] = datetime.timedelta(**rule['kibana4_end_timedelta'])
             if 'kibana_discover_from_timedelta' in rule:
                 rule['kibana_discover_from_timedelta'] = datetime.timedelta(**rule['kibana_discover_from_timedelta'])
             if 'kibana_discover_to_timedelta' in rule:
                 rule['kibana_discover_to_timedelta'] = datetime.timedelta(**rule['kibana_discover_to_timedelta'])
+            if 'opensearch_discover_from_timedelta' in rule:
+                rule['opensearch_discover_from_timedelta'] = datetime.timedelta(**rule['opensearch_discover_from_timedelta'])
+            if 'opensearch_discover_to_timedelta' in rule:
+                rule['opensearch_discover_to_timedelta'] = datetime.timedelta(**rule['opensearch_discover_to_timedelta'])
         except (KeyError, TypeError) as e:
             raise EAException('Invalid time format used: %s' % e)
 
@@ -339,6 +361,7 @@ class RulesLoader(object):
             rule.setdefault(key, val)
         rule.setdefault('name', os.path.splitext(filename)[0])
         rule.setdefault('realert', datetime.timedelta(seconds=0))
+        rule.setdefault('realert_key', rule['name'])
         rule.setdefault('aggregation', datetime.timedelta(seconds=0))
         rule.setdefault('query_delay', datetime.timedelta(seconds=0))
         rule.setdefault('timestamp_field', '@timestamp')
@@ -350,6 +373,7 @@ class RulesLoader(object):
         rule.setdefault('description', "")
         rule.setdefault('jinja_root_name', "_data")
         rule.setdefault('query_timezone', "")
+        rule.setdefault('include_fields', None)
 
         # Set timestamp_type conversion function, used when generating queries and processing hits
         rule['timestamp_type'] = rule['timestamp_type'].strip().lower()
@@ -364,6 +388,9 @@ class RulesLoader(object):
             rule['dt_to_ts'] = dt_to_unixms
         elif rule['timestamp_type'] == 'custom':
             def _ts_to_dt_with_format(ts):
+                if 'timestamp_to_datetime_format_expr' in rule:
+                    # eval expression passing 'ts' before trying to parse it into datetime.
+                    ts = eval(rule['timestamp_to_datetime_format_expr'], {'ts': ts})
                 return ts_to_dt_with_format(ts, ts_format=rule['timestamp_format'])
 
             def _dt_to_ts_with_format(dt):
@@ -392,6 +419,9 @@ class RulesLoader(object):
 
         if 'include' in rule and type(rule['include']) != list:
             raise EAException('include option must be a list')
+
+        if 'include_fields' in rule and rule['include_fields'] is not None and type(rule['include_fields']) != list:
+            raise EAException('include_fields option must be a list')
 
         raw_query_key = rule.get('query_key')
         if isinstance(raw_query_key, list):
@@ -429,24 +459,6 @@ class RulesLoader(object):
         include.append(rule['timestamp_field'])
         rule['include'] = list(set(include))
 
-        # Check that generate_kibana_url is compatible with the filters
-        if rule.get('generate_kibana_link'):
-            for es_filter in rule.get('filter'):
-                if es_filter:
-                    if 'not' in es_filter:
-                        es_filter = es_filter['not']
-                    if 'query' in es_filter:
-                        es_filter = es_filter['query']
-                    if list(es_filter.keys())[0] not in ('term', 'query_string', 'range'):
-                        raise EAException(
-                            'generate_kibana_link is incompatible with filters other than term, query_string and range.'
-                            'Consider creating a dashboard and using use_kibana_dashboard instead.')
-
-        # Check that doc_type is provided if use_count/terms_query
-        if rule.get('use_count_query') or rule.get('use_terms_query'):
-            if 'doc_type' not in rule:
-                raise EAException('doc_type must be specified.')
-
         # Check that query_key is set if use_terms_query
         if rule.get('use_terms_query'):
             if 'query_key' not in rule:
@@ -465,7 +477,9 @@ class RulesLoader(object):
         if rule.get('scan_entire_timeframe') and not rule.get('timeframe'):
             raise EAException('scan_entire_timeframe can only be used if there is a timeframe specified')
 
-        # Compile Jinja Template
+        self.load_jinja_template(rule)
+
+    def load_jinja_template(self, rule):
         if rule.get('alert_text_type') == 'alert_text_jinja':
             jinja_template_path = rule.get('jinja_template_path')
             if jinja_template_path:
@@ -520,6 +534,7 @@ class RulesLoader(object):
                 name, config = next(iter(list(alert.items())))
                 config_copy = copy.copy(rule)
                 config_copy.update(config)  # warning, this (intentionally) mutates the rule dict
+                self.load_jinja_template(config_copy)
                 return name, config_copy
             else:
                 raise EAException()
@@ -547,18 +562,6 @@ class RulesLoader(object):
             raise EAException('Error initiating alert %s: %s' % (rule['alert'], e)).with_traceback(sys.exc_info()[2])
 
         return alert_field
-
-    @staticmethod
-    def adjust_deprecated_values(rule):
-        # From rename of simple HTTP alerter
-        if rule.get('type') == 'simple':
-            rule['type'] = 'post'
-            if 'simple_proxy' in rule:
-                rule['http_post_proxy'] = rule['simple_proxy']
-            if 'simple_webhook_url' in rule:
-                rule['http_post_url'] = rule['simple_webhook_url']
-            elastalert_logger.warning(
-                '"simple" alerter has been renamed "post" and comptability may be removed in a future release.')
 
 
 class FileRulesLoader(RulesLoader):

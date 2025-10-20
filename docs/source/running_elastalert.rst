@@ -1,74 +1,12 @@
 .. _tutorial:
 
-Running ElastAlert 2
-********************
+Getting Started
+***************
 
 ElastAlert 2 can easily be run as :ref:`a Docker container<docker-instructions>`
 or directly on your machine as :ref:`a Python package<python-instructions>`.
 If you are not interested in modifying the internals of  ElastAlert 2, the Docker
 container is recommended for ease of use.
-
-.. _elastalert-arguments:
-
-Configuration flags
-===================
-
-However you choose to run ElastAlert 2, the ElastAlert 2 process is started by invoking
-``python elastalert/elastalert.py``.
-
-This command accepts several configuration flags:
-
-``--config`` will specify the configuration file to use. The default is
-``config.yaml``. See :ref:`here<configuration>` to understand what behaviour
-can be configured in this file.
-
-``--debug`` will run ElastAlert 2 in debug mode. This will increase the logging
-verboseness, change all alerts to ``DebugAlerter``, which prints alerts and
-suppresses their normal action, and skips writing search and alert metadata back
-to Elasticsearch. Not compatible with `--verbose`.
-
-``--end <timestamp>`` will force ElastAlert 2 to stop querying after the given
-time, instead of the default, querying to the present time. This really only
-makes sense when running standalone. The timestamp is formatted as
-``YYYY-MM-DDTHH:MM:SS`` (UTC) or with timezone ``YYYY-MM-DDTHH:MM:SS-XX:00``
-(UTC-XX).
-
-``--es_debug`` will enable logging for all queries made to Elasticsearch.
-
-``--es_debug_trace <trace.log>`` will enable logging curl commands for all
-queries made to Elasticsearch to the specified log file. ``--es_debug_trace`` is
-passed through to `elasticsearch.py
-<http://elasticsearch-py.readthedocs.io/en/master/index.html#logging>`_ which
-logs `localhost:9200` instead of the actual ``es_host``:``es_port``.
-
-``--pin_rules`` will stop ElastAlert 2 from loading, reloading or removing rules
-based on changes to their config files.
-
-``--prometheus_port`` exposes ElastAlert 2 `Prometheus metrics <https://elastalert2.readthedocs.io/en/latest/recipes/exposing_rule_metrics.html>`_ on the specified
-port. Prometheus metrics disabled by default.
-
-``--rule <rule.yaml>`` will only run the given rule. The rule file may be a
-complete file path or a filename in ``rules_folder`` or its subdirectories.
-
-``--silence <unit>=<number>`` will silence the alerts for a given rule for a
-period of time. The rule must be specified using ``--rule``. <unit> is one of
-days, weeks, hours, minutes or seconds. <number> is an integer. For example,
-``--rule noisy_rule.yaml --silence hours=4`` will stop noisy_rule from
-generating any alerts for 4 hours.
-
-``--silence_qk_value <value`` will silence the rule only for the given 
-query key value. This parameter is intended to be used with the ``--rule`` 
-parameter.
-
-``--start <timestamp>`` will force ElastAlert 2 to begin querying from the given
-time, instead of the default, querying from the present. The timestamp should be
-ISO8601, e.g.  ``YYYY-MM-DDTHH:MM:SS`` (UTC) or with timezone
-``YYYY-MM-DDTHH:MM:SS-08:00`` (PST). Note that if querying over a large date
-range, no alerts will be sent until that rule has finished querying over the
-entire time period. To force querying from the current time, use "NOW".
-
-``--verbose`` will increase the logging verboseness, which allows you to see
-information about the state of queries. Not compatible with `--debug`.
 
 .. _docker-instructions:
 
@@ -80,32 +18,110 @@ elastalert2 container image on `Docker Hub <https://hub.docker.com/r/jertel/elas
 
 Be aware that the ``latest`` tag of the image represents the latest commit into
 the master branch. If you prefer to upgrade more slowly you will need utilize a
-versioned tag, such as ``2.2.3`` instead, or ``2`` if you are comfortable with
+versioned tag, such as ``2.26.0`` instead, or ``2`` if you are comfortable with
 always using the latest released version of ElastAlert 2.
 
 A properly configured config.yaml file must be mounted into the container during
 startup of the container. Use the `example file
 <https://github.com/jertel/elastalert2/blob/master/examples/config.yaml.example>`_
-provided as a template, and once saved locally to a file such as
-``/tmp/elastalert.yaml``, run the container as follows:
+as a template.
 
-via Docker Hub (hub.docker.com)
+The following example assumes Elasticsearch container has already been started with Docker. 
+This example also assumes both the Elasticsearch and ElastAlert2 containers are using the default Docker network: ``es_default``
 
-.. code-block::
-
-    docker run -d -v /tmp/elastalert.yaml:/opt/elastalert/config.yaml jertel/elastalert2
-
-via GitHub Container Registry (ghcr.io)
+Create a rule directory and rules file in addition to elastalert.yaml, and then mount both into the ElastAlert 2 container:
 
 .. code-block::
 
-    docker run -d -v /tmp/elastalert.yaml:/opt/elastalert/config.yaml ghcr.io/jertel/elastalert2/elastalert2
+    elastalert.yaml
+    rules/
+      a.yaml
 
-To build the image locally run the following command:
+elastalert.yaml
+
+.. code-block::
+
+    rules_folder: /opt/elastalert/rules
+
+    run_every:
+      seconds: 10
+
+    buffer_time:
+      minutes: 15
+
+    es_host: elasticsearch
+    es_port: 9200
+
+    writeback_index: elastalert_status
+
+    alert_time_limit:
+      days: 2
+
+a.yaml
+
+.. code-block::
+
+    name: "a"
+    type: "frequency"
+    index: "mariadblog-*"
+    is_enabled: true
+    num_events: 2
+    realert:
+      minutes: 5
+    terms_size: 50
+    timeframe:
+      minutes: 5
+    timestamp_field: "@timestamp"
+    timestamp_type: "iso"
+    use_strftime_index: false
+    alert_subject: "Test {} 123 aa☃"
+    alert_subject_args:
+      - "message"
+      - "@log_name"
+    alert_text: "Test {}  123 bb☃"
+    alert_text_args:
+      - "message"
+    filter:
+      - query:
+          query_string:
+            query: "@timestamp:*"
+    alert:
+      - "slack"
+    slack_webhook_url: 'https://hooks.slack.com/services/xxxxxxxxx'
+    slack_channel_override: "#abc"
+    slack_emoji_override: ":kissing_cat:"
+    slack_msg_color: "warning"
+    slack_parse_override: "none"
+    slack_username_override: "elastalert"
+
+Starting the container via Docker Hub (hub.docker.com)
+
+.. code-block::
+
+    docker run --net=es_default -d --name elastalert --restart=always \
+    -v $(pwd)/elastalert.yaml:/opt/elastalert/config.yaml \
+    -v $(pwd)/rules:/opt/elastalert/rules \
+    jertel/elastalert2 --verbose
+
+    docker logs -f elastalert
+
+Starting the container via GitHub Container Registry (ghcr.io)
+
+.. code-block::
+
+    docker run --net=es_default -d --name elastalert --restart=always \
+    -v $(pwd)/elastalert.yaml:/opt/elastalert/config.yaml \
+    -v $(pwd)/rules:/opt/elastalert/rules \
+    ghcr.io/jertel/elastalert2/elastalert2 --verbose
+
+    docker logs -f elastalert
+
+For developers, the below command can be used to build the image locally:
 
 .. code-block::
 
     docker build . -t elastalert2
+
 
 .. _kubernetes-instructions:
 
@@ -114,8 +130,7 @@ As a Kubernetes deployment
 
 The Docker container for ElastAlert 2 can be used directly as a Kubernetes
 deployment, but for convenience, a Helm chart is also available. See the
-instructions provided `on Github
-<https://github.com/jertel/elastalert2/blob/master/chart/elastalert2/README.md>`_
+`Chart Readme <https://github.com/jertel/elastalert2/blob/master/chart/elastalert2/README.md>`_ 
 for more information on how to install, configure, and run the chart.
 
 .. _python-instructions:
@@ -123,16 +138,19 @@ for more information on how to install, configure, and run the chart.
 As a Python package
 ===================
 
+This method is only recommended for advanced users, as providing support is very
+challenging due to the numerous differences between everyone's environment.
+
 Requirements
 ------------
 
-- Elasticsearch
+- Elasticsearch 7, 8, or 9 or OpenSearch 1, 2, or 3
 - ISO8601 or Unix timestamped data
-- Python 3.9
+- Python 3.13. Require OpenSSL 3.0.8 or newer. Note that Python 3.12 is still supported but will be removed in a future release.
 - pip
-- Packages on Ubuntu 21.x: build-essential python3-pip python3.9 python3.9-dev libffi-dev libssl-dev
+- Packages on Ubuntu 24.04: build-essential python3-pip python3.13 python3.13-dev libffi-dev libssl-dev
 
-If you want to install python 3.9 on CentOS, please install python 3.9 from the source code after installing 'Development Tools'.
+If you want to install python 3.13 on CentOS, please install python 3.13 from the source code after installing 'Development Tools'.
 
 Downloading and Configuring
 ---------------------------
@@ -153,73 +171,12 @@ Install the module::
 Next, open up ``examples/config.yaml.example``. In it, you will find several configuration
 options. ElastAlert 2 may be run without changing any of these settings.
 
-``rules_folder`` is where ElastAlert 2 will load rule configuration files from. It
-will attempt to load every .yaml file in the folder. Without any valid rules,
-ElastAlert 2 will not start. ElastAlert 2 will also load new rules, stop running
-missing rules, and restart modified rules as the files in this folder change.
-For this tutorial, we will use the ``examples/rules`` folder.
-
-``run_every`` is how often ElastAlert 2 will query Elasticsearch.
-
-``buffer_time`` is the size of the query window, stretching backwards from the
-time each query is run. This value is ignored for rules where
-``use_count_query`` or ``use_terms_query`` is set to true.
-
-``es_host`` is the primary address of an Elasticsearch cluster where ElastAlert 2 will
-store data about its state, queries run, alerts, and errors. Each rule may also
-use a different Elasticsearch host to query against. For multiple host Elasticsearch 
-clusters see ``es_hosts`` parameter.
-
-``es_port`` is the port corresponding to ``es_host``.
-
-``es_hosts`` is the list of addresses of the nodes of the Elasticsearch cluster. This
-parameter can be used for high availability purposes, but the primary host must also
-be specified in the ``es_host`` parameter. The ``es_hosts`` parameter can be overridden 
-within each rule. This value can be specified as ``host:port`` if overriding the default 
-port.
-
-``use_ssl``: Optional; whether or not to connect to ``es_host`` using TLS; set
-to ``True`` or ``False``.
-
-``verify_certs``: Optional; whether or not to verify TLS certificates; set to
-``True`` or ``False``. The default is ``True``
-
-``ssl_show_warn``: Optional; suppress TLS and certificate related warnings; set
-to ``True`` or ``False``. The default is ``True``.
-
-``client_cert``: Optional; path to a PEM certificate to use as the client
-certificate
-
-``client_key``: Optional; path to a private key file to use as the client key
-
-``ca_certs``: Optional; path to a CA cert bundle to use to verify SSL
-connections
-
-``es_username``: Optional; basic-auth username for connecting to ``es_host``.
-
-``es_password``: Optional; basic-auth password for connecting to ``es_host``.
-
-``es_bearer``: Optional; bearer token authorization for connecting to
-``es_host``. If bearer token is specified, login and password are ignored.
-
-``es_url_prefix``: Optional; URL prefix for the Elasticsearch endpoint.
-
-``statsd_instance_tag``: Optional; prefix for statsd metrics.
-
-``statsd_host``: Optional; statsd host.
-
-``es_send_get_body_as``: Optional; Method for querying Elasticsearch - ``GET``,
-``POST`` or ``source``. The default is ``GET``
-
-``writeback_index`` is the name of the index in which ElastAlert 2 will store
-data. We will create this index later.
-
-``alert_time_limit`` is the retry window for failed alerts.
+See :doc:`configuration` for details on all the configuration options available.
 
 Save the file as ``config.yaml``
 
-Setting Up Elasticsearch
-------------------------
+Manually Creating the ElastAlert 2 Indices
+-------------------------------------------
 
 ElastAlert 2 saves information and metadata about its queries and its alerts back
 to Elasticsearch. This is useful for auditing, debugging, and it allows
@@ -240,8 +197,19 @@ container users will automatically see these indexes created on startup.::
 For information about what data will go here, see :ref:`ElastAlert 2 Metadata
 Index <metadata>`.
 
+Starting ElastAlert 2 via Python CLI
+------------------------------------
+
+There are two ways of invoking ElastAlert 2 without Docker. As a daemon, through Supervisor
+(http://supervisord.org/), or directly with Python as shown below::
+
+    $ python -m elastalert.elastalert --verbose --rule example_frequency.yaml  # or use the entry point: elastalert --verbose --rule ...
+
+The argument ``--verbose`` sets it to display INFO level messages, while ``--rule example_frequency.yaml`` specifies a single rule to
+run, otherwise ElastAlert 2 will attempt to load the other rules in the ``examples/rules`` folder.
+
 Creating a Rule
----------------
+===============
 
 Each rule defines a query to perform, parameters on what triggers a match, and a
 list of alerts to fire for each match. We are going to use
@@ -289,7 +257,7 @@ information. If no filters are desired, it should be specified as an empty list:
 ``filter: []``
 
 ``alert`` is a list of alerts to run on each match. For more information on
-alert types, see :ref:`Alerts <alerts>`. The email alert requires an SMTP server
+alert types, see :ref:`Alert Types <alert_types>`. The email alert requires an SMTP server
 for sending mail. By default, it will attempt to use localhost. This can be
 changed with the ``smtp_host`` option.
 
@@ -307,44 +275,18 @@ As is, this rule means "Send an email to elastalert@example.com when there are
 more than 50 documents with ``some_field == some_value`` within a 4 hour
 period."
 
-Testing Your Rule
------------------
+See :ref:`the testing section for more details <testing>` on how to test a specific rule file without sending alerts.
 
-Running the ``elastalert-test-rule`` tool will test that your config file
-successfully loads and run it in debug mode over the last 24 hours::
+Operational Review
+==================
 
-    $ elastalert-test-rule examples/rules/example_frequency.yaml
+When ElastAlert 2 starts and output is configured to be sent to the console, it will resemble the following::
 
-If you want to specify a configuration file to use, you can run it with the
-config flag::
-
-    $ elastalert-test-rule --config <path-to-config-file> examples/rules/example_frequency.yaml
-
-The configuration preferences will be loaded as follows:
-    1. Configurations specified in the yaml file.
-    2. Configurations specified in the config file, if specified.
-    3. Default configurations, for the tool to run.
-
-See :ref:`the testing section for more details <testing>`
-
-Running ElastAlert 2
---------------------
-
-There are two ways of invoking ElastAlert 2. As a daemon, through Supervisor
-(http://supervisord.org/), or directly with Python. For easier debugging
-purposes in this tutorial, we will invoke it directly::
-
-    $ python -m elastalert.elastalert --verbose --rule example_frequency.yaml  # or use the entry point: elastalert --verbose --rule ...
     No handlers could be found for logger "Elasticsearch"
     INFO:root:Queried rule Example rule from 1-15 14:22 PST to 1-15 15:07 PST: 5 hits
     INFO:Elasticsearch:POST http://elasticsearch.example.com:14900/elastalert_status/elastalert_status?op_type=create [status:201 request:0.025s]
     INFO:root:Ran Example rule from 1-15 14:22 PST to 1-15 15:07 PST: 5 query hits (0 already seen), 0 matches, 0 alerts sent
     INFO:root:Sleeping for 297 seconds
-
-ElastAlert 2 uses the python logging system and ``--verbose`` sets it to display
-INFO level messages. ``--rule example_frequency.yaml`` specifies the rule to
-run, otherwise ElastAlert 2 will attempt to load the other rules in the
-``examples/rules`` folder.
 
 Let's break down the response to see what's happening.
 
@@ -413,7 +355,7 @@ instead be logged and the email will not be sent. In addition, the queries will
 not be saved to ``elastalert_status``.
 
 Disabling a Rule
-----------------
+================
 
 To stop a rule from executing, add or adjust the `is_enabled` option inside the
 rule's YAML file to `false`. When ElastAlert 2 reloads the rules it will detect

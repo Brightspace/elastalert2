@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
-import datetime
-import json
-from unittest import mock
 from jinja2 import Template
 
 from elastalert.alerts import Alerter
 from elastalert.alerts import BasicMatchString
-from elastalert.util import ts_add
 
 
 class mock_rule:
@@ -56,44 +52,6 @@ def test_basic_match_string(ea):
     assert 'some stuff happened' in alert_text
     assert 'username' in alert_text
     assert 'field: value' not in alert_text
-
-
-def test_kibana(ea):
-    rule = {'filter': [{'query': {'query_string': {'query': 'xy:z'}}}],
-            'name': 'Test rule!',
-            'es_host': 'test.testing',
-            'es_port': 12345,
-            'timeframe': datetime.timedelta(hours=1),
-            'index': 'logstash-test',
-            'include': ['@timestamp'],
-            'timestamp_field': '@timestamp'}
-    match = {'@timestamp': '2014-10-10T00:00:00'}
-    with mock.patch("elastalert.elastalert.elasticsearch_client") as mock_es:
-        mock_create = mock.Mock(return_value={'_id': 'ABCDEFGH'})
-        mock_es_inst = mock.Mock()
-        mock_es_inst.index = mock_create
-        mock_es_inst.host = 'test.testing'
-        mock_es_inst.port = 12345
-        mock_es.return_value = mock_es_inst
-        link = ea.generate_kibana_db(rule, match)
-
-    assert 'http://test.testing:12345/_plugin/kibana/#/dashboard/temp/ABCDEFGH' == link
-
-    # Name and index
-    dashboard = json.loads(mock_create.call_args_list[0][1]['body']['dashboard'])
-    assert dashboard['index']['default'] == 'logstash-test'
-    assert 'Test rule!' in dashboard['title']
-
-    # Filters and time range
-    filters = dashboard['services']['filter']['list']
-    assert 'xy:z' in filters['1']['query']
-    assert filters['1']['type'] == 'querystring'
-    time_range = filters['0']
-    assert time_range['from'] == ts_add(match['@timestamp'], -rule['timeframe'])
-    assert time_range['to'] == ts_add(match['@timestamp'], datetime.timedelta(minutes=10))
-
-    # Included fields active in table
-    assert dashboard['rows'][1]['panels'][0]['fields'] == ['@timestamp']
 
 
 def test_alert_text_kw(ea):
@@ -285,6 +243,36 @@ def test_alert_aggregation_summary_markdown_table():
     assert "|-----|-----|-----|" in summary_table
     assert "| field_value | abc from match | 3 |" in summary_table
     assert "| field_value | cde from match | 2 |" in summary_table
+
+
+def test_alert_aggregation_summary_html_table():
+    rule = {
+        'name': 'test_rule',
+        'type': mock_rule(),
+        'owner': 'the_owner',
+        'priority': 2,
+        'alert_subject': 'A very long subject',
+        'aggregation': 1,
+        'summary_table_fields': ['field', 'abc'],
+        'summary_table_type': 'html'
+    }
+    matches = [
+        {'@timestamp': '2016-01-01', 'field': 'field_value', 'abc': 'abc from match', },
+        {'@timestamp': '2016-01-01', 'field': 'field_value', 'abc': 'abc from match', },
+        {'@timestamp': '2016-01-01', 'field': 'field_value', 'abc': 'abc from match', },
+        {'@timestamp': '2016-01-01', 'field': 'field_value', 'abc': 'cde from match', },
+        {'@timestamp': '2016-01-01', 'field': 'field_value', 'abc': 'cde from match', },
+    ]
+    alert = Alerter(rule)
+    summary_table = str(alert.get_aggregation_summary_text(matches))
+    assert '<table' in summary_table
+    assert '<thead>' in summary_table
+    assert 'field' in summary_table
+    assert 'abc' in summary_table
+    assert 'abc from match</td>' in summary_table
+    assert '3</td>' in summary_table
+    assert 'cde from match</td>' in summary_table
+    assert '2</td>' in summary_table
 
 
 def test_alert_aggregation_summary_default_table():

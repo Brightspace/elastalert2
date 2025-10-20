@@ -1,4 +1,4 @@
-FROM python:3-slim-buster as builder
+FROM python:3.13-slim as builder
 
 LABEL description="ElastAlert 2 Official Image"
 LABEL maintainer="Jason Ertel"
@@ -10,7 +10,7 @@ RUN mkdir -p /opt/elastalert && \
     pip install setuptools wheel && \
     python setup.py sdist bdist_wheel
 
-FROM python:3-slim-buster
+FROM python:3.13-slim
 
 ARG GID=1000
 ARG UID=1000
@@ -34,7 +34,7 @@ RUN apt update && apt -y upgrade && \
         >> /opt/elastalert/run.sh && \
     chmod +x /opt/elastalert/run.sh && \
     groupadd -g ${GID} ${USERNAME} && \
-    useradd -u ${UID} -g ${GID} -M -b /opt/elastalert -s /sbin/nologin \
+    useradd -u ${UID} -g ${GID} -M -b /opt -s /sbin/nologin \
         -c "ElastAlert 2 User" ${USERNAME}
 
 USER ${USERNAME}

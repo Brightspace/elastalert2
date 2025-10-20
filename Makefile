@@ -1,5 +1,7 @@
 .PHONY: all production test docs clean
 
+COMPOSE = $(shell if docker compose version >/dev/null 2>&1; then echo " compose"; else echo "-compose"; fi)
+
 all: production
 
 production:
@@ -20,9 +22,9 @@ test-elasticsearch:
 	tox -c tests/tox.ini -- --runelasticsearch
 
 test-docker:
-	docker-compose -f tests/docker-compose.yml --project-name elastalert build tox
-	docker-compose -f tests/docker-compose.yml --project-name elastalert run --rm tox \
-        tox -c tests/tox.ini -- $(filter-out $@,$(MAKECMDGOALS))
+	$(shell echo docker$(COMPOSE)) -f tests/docker-compose.yml --project-name elastalert build tox
+	$(shell echo docker$(COMPOSE)) -f tests/docker-compose.yml --project-name elastalert run --rm tox \
+		tox -c tests/tox.ini -- $(filter-out $@,$(MAKECMDGOALS))
 
 clean:
 	make -C docs clean

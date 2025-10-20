@@ -8,7 +8,6 @@ from requests import RequestException
 from elastalert.alerts import Alerter
 from elastalert.util import lookup_es_key, EAException, elastalert_logger
 
-
 class HiveAlerter(Alerter):
     """
     Use matched data to create alerts containing observables in an instance of TheHive
@@ -34,15 +33,22 @@ class HiveAlerter(Alerter):
         artifacts = []
         for mapping in self.rule.get('hive_observable_data_mapping', []):
             for observable_type, mapping_key in mapping.items():
-                data = str(self.lookup_field(match, mapping_key, ''))
-                if len(data) != 0:
-                    artifact = {'tlp': 2,
-                                'tags': [],
-                                'message': None,
-                                'dataType': observable_type,
-                                'data': data}
-                    artifacts.append(artifact)
-
+                if (observable_type != "tlp" and observable_type != "message" and observable_type != "tags"):
+                    data = str(self.lookup_field(match, mapping_key, ''))
+                    if len(data) != 0:
+                        artifact = {'tlp': 2,
+                                    'tags': [],
+                                    'message': None,
+                                    'dataType': observable_type,
+                                    'data': data}
+                        if mapping.get('tlp') is not None:
+                            artifact['tlp'] = mapping['tlp']
+                        if mapping.get('message') is not None:
+                            artifact['message'] = mapping['message']
+                        if mapping.get('tags') is not None:
+                            artifact['tags'] = mapping['tags']
+                        artifacts.append(artifact)
+                break
         return artifacts
 
     def load_custom_fields(self, custom_fields_raw: list, match: dict):
@@ -72,6 +78,25 @@ class HiveAlerter(Alerter):
 
         return tag_values
 
+    def load_args(self, field, raw, match: dict):
+        missing = self.rule['hive_alert_config'].get(field + '_missing_value', '<MISSING VALUE>')
+        args = field + "_args"
+        if args in self.rule.get('hive_alert_config'):
+            process_args = self.rule['hive_alert_config'].get(args)
+            process_values=[]
+            for arg in process_args:
+                process_values.append(self.lookup_field(match, arg, missing))
+            for i, text_value in enumerate(process_values):
+                if text_value is None:
+                    process_value = self.rule.get(process_args[i])
+                    if process_value:
+                        process_values[i] = process_value
+            process_values = [missing if val is None else val for val in process_values]
+            raw = raw.format(*process_values)
+            return raw
+        else:
+            return raw
+
     def alert(self, matches):
         # Build TheHive alert object, starting with some defaults, updating with any
         # user-specified config
@@ -85,7 +110,7 @@ class HiveAlerter(Alerter):
             'title': self.create_title(matches),
         }
         alert_config.update(self.rule.get('hive_alert_config', {}))
-
+        
         # Iterate through each match found, populating the alert tags and observables as required
         tags = set()
         artifacts = []
@@ -97,8 +122,24 @@ class HiveAlerter(Alerter):
         alert_config['tags'] = list(tags)
 
         # Populate the customFields
-        alert_config['customFields'] = self.load_custom_fields(alert_config['customFields'],
-                                                               matches[0])
+        if len(matches) > 0:
+            #Populate dynamic fields
+            alert_config['customFields'] = self.load_custom_fields(alert_config['customFields'], matches[0])
+            alert_config['description']=self.load_args("description", alert_config['description'], matches[0])
+            if 'description_args' in alert_config:
+                del alert_config['description_args']
+            
+            alert_config["title"] = self.load_args("title", alert_config["title"], matches[0])
+            if 'title_args' in alert_config:
+                del alert_config['title_args']
+
+            alert_config["type"] = self.load_args("type", alert_config["type"], matches[0])
+            if 'type_args' in alert_config:
+                del alert_config['type_args']
+
+            alert_config["source"] = self.load_args("source", alert_config["source"], matches[0])
+            if 'source_args' in alert_config:
+                del alert_config['source_args']            
 
         # POST the alert to TheHive
         connection_details = self.rule['hive_connection']

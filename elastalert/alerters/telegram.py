@@ -22,9 +22,15 @@ class TelegramAlerter(Alerter):
         self.telegram_proxy = self.rule.get('telegram_proxy', None)
         self.telegram_proxy_login = self.rule.get('telegram_proxy_login', None)
         self.telegram_proxy_password = self.rule.get('telegram_proxy_pass', None)
+        self.telegram_parse_mode = self.rule.get('telegram_parse_mode', 'markdown')
+        self.telegram_thread_id = self.rule.get('telegram_thread_id', None)
 
     def alert(self, matches):
-        body = '⚠ *%s* ⚠ ```\n' % (self.create_title(matches))
+        if self.telegram_parse_mode != 'html':
+            body = '⚠ *%s* ⚠ ```\n' % (self.create_title(matches))
+        else:
+            body = '⚠ %s ⚠ \n' % (self.create_title(matches))
+
         for match in matches:
             body += str(BasicMatchString(self.rule, match))
             # Separate text of aggregated alerts with dashes
@@ -32,7 +38,9 @@ class TelegramAlerter(Alerter):
                 body += '\n----------------------------------------\n'
         if len(body) > 4095:
             body = body[0:4000] + "\n⚠ *message was cropped according to telegram limits!* ⚠"
-        body += ' ```'
+
+        if self.telegram_parse_mode != 'html':
+            body += ' ```'
 
         headers = {'content-type': 'application/json'}
         # set https proxy, if it was provided
@@ -41,8 +49,9 @@ class TelegramAlerter(Alerter):
         payload = {
             'chat_id': self.telegram_room_id,
             'text': body,
-            'parse_mode': 'markdown',
-            'disable_web_page_preview': True
+            'parse_mode': self.telegram_parse_mode,
+            'disable_web_page_preview': True,
+            'message_thread_id': self.telegram_thread_id
         }
 
         try:

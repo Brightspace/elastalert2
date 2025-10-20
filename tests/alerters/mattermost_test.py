@@ -44,7 +44,10 @@ def test_mattermost_proxy(caplog):
                 'fields': [],
                 'text': 'Test Mattermost Rule\n\n'
             }
-        ], 'username': 'elastalert'
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -91,7 +94,10 @@ def test_mattermost_alert_text_only():
                 'fields': [],
                 'text': 'Test Mattermost Rule\n\n'
             }
-        ], 'username': 'elastalert'
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -138,7 +144,9 @@ def test_mattermost_not_alert_text_only():
             }
         ],
         'text': 'Test Mattermost Rule\n\n',
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -200,7 +208,10 @@ def test_mattermost_msg_fields():
                 ],
                 'text': 'Test Mattermost Rule\n\n'
             }
-        ], 'username': 'elastalert'
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -249,6 +260,7 @@ def test_mattermost_icon_url_override():
             }
         ],
         'username': 'elastalert',
+        'channel': '',
         'icon_url': 'http://xxxx/icon.png'
     }
 
@@ -298,7 +310,8 @@ def test_mattermost_channel_override():
             }
         ],
         'username': 'elastalert',
-        'channel': 'test channel'
+        'channel': 'test channel',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -346,7 +359,9 @@ def test_mattermost_ignore_ssl_errors():
                 'text': 'Test Mattermost Rule\n\n'
             }
         ],
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -396,7 +411,9 @@ def test_mattermost_title_link():
                 'title_link': 'http://title.url'
             }
         ],
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -445,7 +462,9 @@ def test_mattermost_footer():
                 'footer': 'Mattermost footer'
             }
         ],
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -494,7 +513,9 @@ def test_mattermost_footer_icon():
                 'footer_icon': 'http://icon.url'
             }
         ],
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -543,7 +564,9 @@ def test_mattermost_image_url():
                 'image_url': 'http://image.url'
             }
         ],
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -592,7 +615,9 @@ def test_mattermost_thumb_url():
                 'thumb_url': 'http://thumb.url'
             }
         ],
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -641,7 +666,9 @@ def test_mattermost_author_name():
                 'author_name': 'author name'
             }
         ],
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -690,7 +717,9 @@ def test_mattermost_author_link():
                 'author_link': 'http://author.link.url'
             }
         ],
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -739,7 +768,9 @@ def test_mattermost_author_icon():
                 'author_icon': 'http://author.icon.url'
             }
         ],
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -841,7 +872,9 @@ def test_mattermost_msg_color(msg_color, except_msg_color):
                 'author_icon': 'http://author.icon.url'
             }
         ],
-        'username': 'elastalert'
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -944,7 +977,10 @@ def test_mattermost_attach_kibana_discover_url_when_generated():
                 'title': 'Discover in Kibana',
                 'title_link': 'http://localhost:5601/app/discover#/'
             }
-        ], 'username': 'elastalert'
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
     mock_post_request.assert_called_once_with(
         rule['mattermost_webhook_url'],
@@ -986,7 +1022,10 @@ def test_mattermost_attach_kibana_discover_url_when_not_generated():
                 'fields': [],
                 'text': 'Test Rule\n\n'
             }
-        ], 'username': 'elastalert'
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
     mock_post_request.assert_called_once_with(
         rule['mattermost_webhook_url'],
@@ -1035,7 +1074,10 @@ def test_mattermost_kibana_discover_title():
                 'title': 'Click to discover in Kibana',
                 'title_link': 'http://localhost:5601/app/discover#/'
             }
-        ], 'username': 'elastalert'
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
     mock_post_request.assert_called_once_with(
         rule['mattermost_webhook_url'],
@@ -1084,7 +1126,210 @@ def test_mattermost_kibana_discover_color():
                 'title': 'Discover in Kibana',
                 'title_link': 'http://localhost:5601/app/discover#/'
             }
-        ], 'username': 'elastalert'
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
+    }
+    mock_post_request.assert_called_once_with(
+        rule['mattermost_webhook_url'],
+        data=mock.ANY,
+        headers={'content-type': 'application/json'},
+        verify=True,
+        proxies=None
+    )
+
+    actual_data = json.loads(mock_post_request.call_args_list[0][1]['data'])
+    assert expected_data == actual_data
+
+
+def test_mattermost_attach_opensearch_discover_url_when_generated():
+    rule = {
+        'name': 'Test Rule',
+        'type': 'any',
+        'alert_text_type': 'alert_text_only',
+        'mattermost_attach_opensearch_discover_url': True,
+        'mattermost_webhook_url': 'http://please.dontgohere.mattermost',
+        'alert': []
+    }
+    rules_loader = FileRulesLoader({})
+    rules_loader.load_modules(rule)
+    alert = MattermostAlerter(rule)
+    match = {
+        '@timestamp': '2021-01-01T00:00:00',
+        'opensearch_discover_url': 'http://localhost:5601/app/discover#/'
+    }
+    with mock.patch('requests.post') as mock_post_request:
+        alert.alert([match])
+
+    expected_data = {
+        'attachments': [
+            {
+                'fallback': 'Test Rule: ',
+                'color': 'danger',
+                'title': 'Test Rule',
+                'pretext': '',
+                'fields': [],
+                'text': 'Test Rule\n\n'
+            },
+            {
+                'color': '#ec4b98',
+                'title': 'Discover in opensearch',
+                'title_link': 'http://localhost:5601/app/discover#/'
+            }
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
+    }
+    mock_post_request.assert_called_once_with(
+        rule['mattermost_webhook_url'],
+        data=mock.ANY,
+        headers={'content-type': 'application/json'},
+        verify=True,
+        proxies=None
+    )
+
+    actual_data = json.loads(mock_post_request.call_args_list[0][1]['data'])
+    assert expected_data == actual_data
+
+
+def test_mattermost_attach_opensearch_discover_url_when_not_generated():
+    rule = {
+        'name': 'Test Rule',
+        'type': 'any',
+        'alert_text_type': 'alert_text_only',
+        'mattermost_attach_opensearch_discover_url': True,
+        'mattermost_webhook_url': 'http://please.dontgohere.mattermost',
+        'alert': []
+    }
+    rules_loader = FileRulesLoader({})
+    rules_loader.load_modules(rule)
+    alert = MattermostAlerter(rule)
+    match = {
+        '@timestamp': '2021-01-01T00:00:00'
+    }
+    with mock.patch('requests.post') as mock_post_request:
+        alert.alert([match])
+
+    expected_data = {
+        'attachments': [
+            {
+                'fallback': 'Test Rule: ',
+                'color': 'danger',
+                'title': 'Test Rule',
+                'pretext': '',
+                'fields': [],
+                'text': 'Test Rule\n\n'
+            }
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
+    }
+    mock_post_request.assert_called_once_with(
+        rule['mattermost_webhook_url'],
+        data=mock.ANY,
+        headers={'content-type': 'application/json'},
+        verify=True,
+        proxies=None
+    )
+
+    actual_data = json.loads(mock_post_request.call_args_list[0][1]['data'])
+    assert expected_data == actual_data
+
+
+def test_mattermost_opensearch_discover_title():
+    rule = {
+        'name': 'Test Rule',
+        'type': 'any',
+        'alert_text_type': 'alert_text_only',
+        'mattermost_attach_opensearch_discover_url': True,
+        'mattermost_opensearch_discover_title': 'Click to discover in opensearch',
+        'mattermost_webhook_url': 'http://please.dontgohere.mattermost',
+        'alert': []
+    }
+    rules_loader = FileRulesLoader({})
+    rules_loader.load_modules(rule)
+    alert = MattermostAlerter(rule)
+    match = {
+        '@timestamp': '2021-01-01T00:00:00',
+        'opensearch_discover_url': 'http://localhost:5601/app/discover#/'
+    }
+    with mock.patch('requests.post') as mock_post_request:
+        alert.alert([match])
+
+    expected_data = {
+        'attachments': [
+            {
+                'fallback': 'Test Rule: ',
+                'color': 'danger',
+                'title': 'Test Rule',
+                'pretext': '',
+                'fields': [],
+                'text': 'Test Rule\n\n'
+            },
+            {
+                'color': '#ec4b98',
+                'title': 'Click to discover in opensearch',
+                'title_link': 'http://localhost:5601/app/discover#/'
+            }
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
+    }
+    mock_post_request.assert_called_once_with(
+        rule['mattermost_webhook_url'],
+        data=mock.ANY,
+        headers={'content-type': 'application/json'},
+        verify=True,
+        proxies=None
+    )
+
+    actual_data = json.loads(mock_post_request.call_args_list[0][1]['data'])
+    assert expected_data == actual_data
+
+
+def test_mattermost_opensearch_discover_color():
+    rule = {
+        'name': 'Test Rule',
+        'type': 'any',
+        'alert_text_type': 'alert_text_only',
+        'mattermost_attach_opensearch_discover_url': True,
+        'mattermost_opensearch_discover_color': 'blue',
+        'mattermost_webhook_url': 'http://please.dontgohere.mattermost',
+        'alert': []
+    }
+    rules_loader = FileRulesLoader({})
+    rules_loader.load_modules(rule)
+    alert = MattermostAlerter(rule)
+    match = {
+        '@timestamp': '2021-01-01T00:00:00',
+        'opensearch_discover_url': 'http://localhost:5601/app/discover#/'
+    }
+    with mock.patch('requests.post') as mock_post_request:
+        alert.alert([match])
+
+    expected_data = {
+        'attachments': [
+            {
+                'fallback': 'Test Rule: ',
+                'color': 'danger',
+                'title': 'Test Rule',
+                'pretext': '',
+                'fields': [],
+                'text': 'Test Rule\n\n'
+            },
+            {
+                'color': 'blue',
+                'title': 'Discover in opensearch',
+                'title_link': 'http://localhost:5601/app/discover#/'
+            }
+        ],
+        'username': 'elastalert',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
     mock_post_request.assert_called_once_with(
         rule['mattermost_webhook_url'],
@@ -1130,7 +1375,10 @@ def test_mattermost_username_override():
                 'fields': [],
                 'text': 'Test Mattermost Rule\n\n'
             }
-        ], 'username': 'test user'
+        ],
+        'username': 'test user',
+        'channel': '',
+        'icon_emoji': ':ghost:'
     }
 
     mock_post_request.assert_called_once_with(
@@ -1143,3 +1391,67 @@ def test_mattermost_username_override():
 
     actual_data = json.loads(mock_post_request.call_args_list[0][1]['data'])
     assert expected_data == actual_data
+
+
+def test_mattermost_uses_list_of_custom_mattermost_channel():
+    rule = {
+        'name': 'Test Mattermost Rule',
+        'type': 'any',
+        'alert_text_type': 'alert_text_only',
+        'mattermost_webhook_url': 'http://xxxxx',
+        'mattermost_msg_pretext': 'aaaaa',
+        'mattermost_msg_color': 'danger',
+        'mattermost_channel_override': ['#test-alert', '#test-alert2'],
+        'alert': [],
+        'alert_subject': 'Test Mattermost'
+    }
+    rules_loader = FileRulesLoader({})
+    rules_loader.load_modules(rule)
+    alert = MattermostAlerter(rule)
+    match = {
+        '@timestamp': '2021-01-01T00:00:00',
+        'somefield': 'foobarbaz'
+    }
+    with mock.patch('requests.post') as mock_post_request:
+        alert.alert([match])
+
+    expected_data1 = {
+        'attachments': [
+            {
+                'fallback': 'Test Mattermost: aaaaa',
+                'color': 'danger',
+                'title': 'Test Mattermost',
+                'pretext': 'aaaaa',
+                'fields': [],
+                'text': 'Test Mattermost Rule\n\n'
+            }
+        ],
+        'username': 'elastalert',
+        'channel': '#test-alert',
+        'icon_emoji': ':ghost:'
+    }
+    expected_data2 = {
+        'attachments': [
+            {
+                'fallback': 'Test Mattermost: aaaaa',
+                'color': 'danger',
+                'title': 'Test Mattermost',
+                'pretext': 'aaaaa',
+                'fields': [],
+                'text': 'Test Mattermost Rule\n\n'
+            }
+        ],
+        'username': 'elastalert',
+        'channel': '#test-alert2',
+        'icon_emoji': ':ghost:'
+    }
+    mock_post_request.assert_called_with(
+        rule['mattermost_webhook_url'],
+        data=mock.ANY,
+        headers={'content-type': 'application/json'},
+        verify=True,
+        proxies=None
+    )
+
+    assert expected_data1 == json.loads(mock_post_request.call_args_list[0][1]['data'])
+    assert expected_data2 == json.loads(mock_post_request.call_args_list[1][1]['data'])
