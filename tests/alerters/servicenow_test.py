@@ -150,6 +150,40 @@ def test_service_now_impact_and_urgency():
     assert data['urgency'] == rule['servicenow_urgency']
 
 
+def test_service_now_additional_arguments():
+    rule = {
+        'name': 'Test ServiceNow Rule',
+        'type': 'any',
+        'username': 'ServiceNow username',
+        'password': 'ServiceNow password',
+        'servicenow_rest_url': 'https://xxxxxxxxxx',
+        'short_description': 'ServiceNow short_description',
+        'comments': 'ServiceNow comments',
+        'assignment_group': 'ServiceNow assignment_group',
+        'category': 'ServiceNow category',
+        'subcategory': 'ServiceNow subcategory',
+        'cmdb_ci': 'ServiceNow cmdb_ci',
+        'caller_id': 'ServiceNow caller_id',
+        'service_now_additional_fields': {
+            'fielda': 'Value A',
+            'fieldb': 'Value B',
+        },
+        'alert': []
+    }
+    rules_loader = FileRulesLoader({})
+    rules_loader.load_modules(rule)
+    alert = ServiceNowAlerter(rule)
+    match = {
+        '@timestamp': '2021-01-01T00:00:00',
+        'somefield': 'foobarbaz'
+    }
+    with mock.patch('requests.post') as mock_post_request:
+        alert.alert([match])
+    data = json.loads(mock_post_request.call_args_list[0][1]['data'])
+    assert data['fielda'] == rule['service_now_additional_fields']['fielda']
+    assert data['fieldb'] == rule['service_now_additional_fields']['fieldb']
+
+
 def test_service_now_ea_exception():
     with pytest.raises(EAException) as ea:
         rule = {
@@ -212,21 +246,21 @@ def test_servicenow_getinfo():
 
 servicenow_required_error_param = 'username, password, servicenow_rest_url, short_description, comments, '
 servicenow_required_error_param += 'assignment_group, category, subcategory, cmdb_ci, caller_id, expected_data'
-servicenow_required_error_excepted = 'username, password, servicenow_rest_url, short_description, comments, '
-servicenow_required_error_excepted += 'assignment_group, category, subcategory, cmdb_ci, caller_id'
+servicenow_required_error_expected = 'username, password, servicenow_rest_url, short_description, comments, '
+servicenow_required_error_expected += 'assignment_group, category, subcategory, cmdb_ci, caller_id'
 
 
 @pytest.mark.parametrize(servicenow_required_error_param, [
-    ('',  '',  '',  '',  '',  '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_excepted),
-    ('a', '',  '',  '',  '',  '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_excepted),
-    ('a', 'b', '',  '',  '',  '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_excepted),
-    ('a', 'b', 'c', '',  '',  '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_excepted),
-    ('a', 'b', 'c', 'd', '',  '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_excepted),
-    ('a', 'b', 'c', 'd', 'e', '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_excepted),
-    ('a', 'b', 'c', 'd', 'e', 'f', ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_excepted),
-    ('a', 'b', 'c', 'd', 'e', 'f', 'g' '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_excepted),
-    ('a', 'b', 'c', 'd', 'e', 'f', 'g' 'h', '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_excepted),
-    ('a', 'b', 'c', 'd', 'e', 'f', 'g' 'h', 'i', '',  '', 'Missing required option(s): ' + servicenow_required_error_excepted),
+    ('',  '',  '',  '',  '',  '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_expected),
+    ('a', '',  '',  '',  '',  '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_expected),
+    ('a', 'b', '',  '',  '',  '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_expected),
+    ('a', 'b', 'c', '',  '',  '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_expected),
+    ('a', 'b', 'c', 'd', '',  '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_expected),
+    ('a', 'b', 'c', 'd', 'e', '',  ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_expected),
+    ('a', 'b', 'c', 'd', 'e', 'f', ''  '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_expected),
+    ('a', 'b', 'c', 'd', 'e', 'f', 'g' '',  '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_expected),
+    ('a', 'b', 'c', 'd', 'e', 'f', 'g' 'h', '',  '',  '', 'Missing required option(s): ' + servicenow_required_error_expected),
+    ('a', 'b', 'c', 'd', 'e', 'f', 'g' 'h', 'i', '',  '', 'Missing required option(s): ' + servicenow_required_error_expected),
     ('a', 'b', 'c', 'd', 'e', 'f', 'g' 'h', 'i', 'j', 'k',
         {
             "type": "ServiceNow",

@@ -1,10 +1,12 @@
 import datetime
 import sys
+import os
 
 from elastalert.alerts import Alerter
 from elastalert.alerts import BasicMatchString
 from elastalert.util import (elastalert_logger, lookup_es_key, pretty_ts, ts_now,
                              ts_to_dt, EAException)
+from elastalert.yaml import read_yaml
 from jira.client import JIRA
 from jira.exceptions import JIRAError
 
@@ -44,6 +46,7 @@ class JiraAlerter(Alerter):
         'jira_server',
         'jira_transition_to',
         'jira_watchers',
+        'jira_parent'
     ]
 
     # Some built-in Jira types that can be used as custom fields require special handling
@@ -64,6 +67,8 @@ class JiraAlerter(Alerter):
         self.get_account(self.rule['jira_account_file'])
         self.project = self.rule['jira_project']
         self.issue_type = self.rule['jira_issuetype']
+        # this parameter use to create subtasks
+        self.parent = self.rule.get('jira_parent', None)
 
         # Deferred settings refer to values that can only be resolved when a match
         # is found and as such loading them will be delayed until we find a match
@@ -86,7 +91,7 @@ class JiraAlerter(Alerter):
         self.bump_in_statuses = self.rule.get('jira_bump_in_statuses')
         self.bump_after_inactivity = self.rule.get('jira_bump_after_inactivity', 0)
         self.bump_only = self.rule.get('jira_bump_only', False)
-        self.transition = self.rule.get('jira_transition_to', False)
+        self.transition = self.rule.get('jira_transition_to', None)
         self.watchers = self.rule.get('jira_watchers')
         self.client = None
 
@@ -103,7 +108,10 @@ class JiraAlerter(Alerter):
         self.reset_jira_args()
 
         try:
-            self.client = JIRA(self.server, basic_auth=(self.user, self.password))
+            if hasattr(self, 'apikey'):
+                self.client = JIRA(self.server, token_auth=(self.apikey))
+            else:
+                self.client = JIRA(self.server, basic_auth=(self.user, self.password))
             self.get_priorities()
             self.jira_fields = self.client.fields()
             self.get_arbitrary_fields()
@@ -121,8 +129,13 @@ class JiraAlerter(Alerter):
             elastalert_logger.error("Priority %s not found. Valid priorities are %s" % (self.priority, list(self.priority_ids.keys())))
 
     def reset_jira_args(self):
-        self.jira_args = {'project': {'key': self.project},
-                          'issuetype': {'name': self.issue_type}}
+        if self.parent:
+            self.jira_args = {'project': {'key': self.project},
+                                'parent': {'key': self.parent},
+                                'issuetype': {'name': self.issue_type}}
+        else:
+            self.jira_args = {'project': {'key': self.project},
+                            'issuetype': {'name': self.issue_type}}
 
         if self.components:
             # Support single component or list
@@ -139,8 +152,6 @@ class JiraAlerter(Alerter):
             # Support single watcher or list
             if type(self.watchers) != list:
                 self.watchers = [self.watchers]
-        if self.assignee:
-            self.jira_args['assignee'] = {'name': self.assignee}
 
         self.set_priority()
 
@@ -227,13 +238,6 @@ class JiraAlerter(Alerter):
         self.priority_ids = {}
         for x in range(len(priorities)):
             self.priority_ids[x] = priorities[x].id
-
-    def set_assignee(self, assignee):
-        self.assignee = assignee
-        if assignee:
-            self.jira_args['assignee'] = {'name': assignee}
-        elif 'assignee' in self.jira_args:
-            self.jira_args.pop('assignee')
 
     def find_existing_ticket(self, matches):
         # Default title, get stripped search version
@@ -331,6 +335,10 @@ class JiraAlerter(Alerter):
         try:
             self.issue = self.client.create_issue(**self.jira_args)
 
+            # Set JIRA assignee
+            if self.assignee:
+                self.client.assign_issue(self.issue, self.assignee)
+
             # You can not add watchers on initial creation. Only as a follow-up action
             if self.watchers:
                 for watcher in self.watchers:
@@ -393,3 +401,22 @@ class JiraAlerter(Alerter):
 
     def get_info(self):
         return {'type': 'jira'}
+
+    def get_account(self, account_file):
+        """ Gets the username and password, or the apikey, from an account file.
+
+        :param account_file: Path to the file which contains the credentials.
+        It can be either an absolute file path or one that is relative to the given rule.
+        """
+        if os.path.isabs(account_file):
+            account_file_path = account_file
+        else:
+            account_file_path = os.path.join(os.path.dirname(self.rule['rule_file']), account_file)
+        account_conf = read_yaml(account_file_path)
+        if not (('user' in account_conf and 'password' in account_conf) or 'apikey' in account_conf):
+            raise EAException('Account file must have user and password fields, or apikey field')
+        if 'apikey' in account_conf:
+            self.apikey = account_conf['apikey']
+        else:
+            self.user = account_conf['user']
+            self.password = account_conf['password']

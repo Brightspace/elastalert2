@@ -25,6 +25,9 @@ class MattermostAlerter(Alerter):
         # Override webhook config
         self.mattermost_username_override = self.rule.get('mattermost_username_override', 'elastalert')
         self.mattermost_channel_override = self.rule.get('mattermost_channel_override', '')
+        if isinstance(self.mattermost_channel_override, str):
+            self.mattermost_channel_override = [self.mattermost_channel_override]
+        self.mattermost_emoji_override = self.rule.get('mattermost_emoji_override', ':ghost:')
         self.mattermost_icon_url_override = self.rule.get('mattermost_icon_url_override', '')
 
         # Message properties
@@ -44,6 +47,9 @@ class MattermostAlerter(Alerter):
         self.mattermost_attach_kibana_discover_url = self.rule.get('mattermost_attach_kibana_discover_url', False)
         self.mattermost_kibana_discover_color = self.rule.get('mattermost_kibana_discover_color', '#ec4b98')
         self.mattermost_kibana_discover_title = self.rule.get('mattermost_kibana_discover_title', 'Discover in Kibana')
+        self.mattermost_attach_opensearch_discover_url = self.rule.get('mattermost_attach_opensearch_discover_url', False)
+        self.mattermost_opensearch_discover_color = self.rule.get('mattermost_opensearch_discover_color', '#ec4b98')
+        self.mattermost_opensearch_discover_title = self.rule.get('mattermost_opensearch_discover_title', 'Discover in opensearch')
 
     def get_aggregation_summary_text__maximum_width(self):
         width = super(MattermostAlerter, self).get_aggregation_summary_text__maximum_width()
@@ -102,9 +108,8 @@ class MattermostAlerter(Alerter):
 
         if self.mattermost_icon_url_override != '':
             payload['icon_url'] = self.mattermost_icon_url_override
-
-        if self.mattermost_channel_override != '':
-            payload['channel'] = self.mattermost_channel_override
+        else:
+            payload['icon_emoji'] = self.mattermost_emoji_override
 
         if self.mattermost_title != '':
             payload['attachments'][0]['title'] = self.mattermost_title
@@ -141,21 +146,33 @@ class MattermostAlerter(Alerter):
                     'title': self.mattermost_kibana_discover_title,
                     'title_link': kibana_discover_url
                 })
+                
+        if self.mattermost_attach_opensearch_discover_url:
+            opensearch_discover_url = lookup_es_key(matches[0], 'opensearch_discover_url')
+            if opensearch_discover_url:
+                payload['attachments'].append({
+                    'color': self.mattermost_opensearch_discover_color,
+                    'title': self.mattermost_opensearch_discover_title,
+                    'title_link': opensearch_discover_url
+                })
 
+        
         for url in self.mattermost_webhook_url:
-            try:
-                if self.mattermost_ignore_ssl_errors:
-                    requests.urllib3.disable_warnings()
+            for channel_override in self.mattermost_channel_override:
+                try:
+                    if self.mattermost_ignore_ssl_errors:
+                        requests.urllib3.disable_warnings()
+                    payload['channel'] = channel_override
 
-                response = requests.post(
-                    url, data=json.dumps(payload, cls=DateTimeEncoder),
-                    headers=headers, verify=not self.mattermost_ignore_ssl_errors,
-                    proxies=proxies)
+                    response = requests.post(
+                        url, data=json.dumps(payload, cls=DateTimeEncoder),
+                        headers=headers, verify=not self.mattermost_ignore_ssl_errors,
+                        proxies=proxies)
 
-                warnings.resetwarnings()
-                response.raise_for_status()
-            except RequestException as e:
-                raise EAException("Error posting to Mattermost: %s" % e)
+                    warnings.resetwarnings()
+                    response.raise_for_status()
+                except RequestException as e:
+                    raise EAException("Error posting to Mattermost: %s" % e)
         elastalert_logger.info("Alert sent to Mattermost")
 
     def get_info(self):
